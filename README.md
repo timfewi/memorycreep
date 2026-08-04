@@ -5,6 +5,8 @@
 # PentestAgent
 ### AI Penetration Testing
 
+<a href="https://trendshift.io/repositories/15897?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-15897" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/15897" alt="GH05TCREW%2Fpentestagent | Trendshift" width="250" height="55"/></a>
+
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt) [![Version](https://img.shields.io/badge/Version-0.2.0-orange.svg)](https://github.com/GH05TCREW/pentestagent/releases) [![Security](https://img.shields.io/badge/Security-Penetration%20Testing-red.svg)](https://github.com/GH05TCREW/pentestagent) [![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://github.com/GH05TCREW/pentestagent)
 
 </div>
