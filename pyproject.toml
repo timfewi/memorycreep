@@ -1,10 +1,10 @@
 [project]
-name = "pentestagent"
+name = "memorycreep"
 version = "0.2.0"
-description = "AI penetration testing"
+description = "Hardened NixOS workstation for policy-bound AI-assisted security testing"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.10"
+requires-python = ">=3.12,<3.13"
 authors = [
     {name = "Masic"}
 ]
@@ -23,78 +23,87 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "litellm>=1.82.0",
-    "openai>=2.0.0",
-    "anthropic>=0.84.0",
-    "tiktoken>=0.12.0",
-    "aiohttp>=3.13.0",
-    "aiofiles>=25.0.0",
-    "playwright>=1.50.0",
-    "beautifulsoup4>=4.12.0",
-    "httpx>=0.27.0",
-    "numpy>=2.0.0",
-    "networkx>=3.3",
-    "docker>=7.1.0",
-    "rich>=14.0.0",
-    "textual>=8.0.0",
-    "typer>=0.24.0",
-    "pydantic>=2.7.0",
-    "pydantic-settings>=2.2.0",
-    "python-dotenv>=1.0.0",
-    "pyyaml>=6.0.0",
-    "jinja2>=3.1.0",
-    "pyte>=0.8.0",
-    "pyperclip>=1.11.0",
+    "litellm==1.82.0",
+    "openai==2.0.0",
+    "anthropic==0.84.0",
+    "tiktoken==0.12.0",
+    "aiohttp==3.13.0",
+    "aiofiles==25.0.0",
+    "playwright==1.50.0",
+    "beautifulsoup4==4.12.0",
+    "httpx==0.27.0",
+    "numpy==2.0.0",
+    "networkx==3.3",
+    "docker==7.1.0",
+    "rich==14.0.0",
+    "textual==8.0.0",
+    "typer==0.24.0",
+    "pydantic==2.7.0",
+    "pydantic-settings==2.2.0",
+    "python-dotenv==1.0.0",
+    "pyyaml==6.0.0",
+    "jinja2==3.1.0",
+    "pyte==0.8.0",
+    "pyperclip==1.11.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.0",
-    "pytest-asyncio>=1.0.0",
-    "pytest-cov>=7.0.0",
-    "pytest-mock>=3.14.0",
-    "black>=26.0.0",
-    "isort>=8.0.0",
-    "mypy>=1.19.0",
-    "ruff>=0.15.0",
+    "pytest==9.0.0",
+    "pytest-asyncio==1.0.0",
+    "pytest-cov==7.0.0",
+    "pytest-mock==3.14.0",
+    "black==26.0.0",
+    "isort==8.0.0",
+    "mypy==1.19.0",
+    "ruff==0.15.0",
 ]
 rag = [
-    "sentence-transformers>=5.0.0",
-    "faiss-cpu>=1.8.0",
+    "sentence-transformers==5.0.0",
+    "faiss-cpu==1.8.0",
 ]
 all = [
-    "pentestagent[dev,rag]",
+    "memorycreep[dev,rag]",
 ]
 hexstrike = [
-    "flask>=2.3.0,<4.0.0",
-    "requests>=2.31.0,<3.0.0",
-    "psutil>=5.9.0,<8.0.0",
-    "fastmcp>=0.2.0,<4.0.0",
-    "beautifulsoup4>=4.12.0,<5.0.0",
-    "selenium>=4.15.0,<5.0.0",
-    "webdriver-manager>=4.0.0,<5.0.0",
-    "aiohttp>=3.8.0,<4.0.0",
-    "mitmproxy>=9.0.0,<12.0.0",
-    "pwntools>=4.10.0,<5.0.0",
-    "angr>=9.2.0,<10.0.0",
+    "flask==2.3.0",
+    "requests==2.31.0",
+    "psutil==5.9.0",
+    "fastmcp==0.2.0",
+    "beautifulsoup4==4.12.0",
+    "selenium==4.15.0",
+    "webdriver-manager==4.0.0",
+    "aiohttp==3.8.0",
+    "mitmproxy==9.0.0",
+    "pwntools==4.10.0",
+    "angr==9.2.0",
     "bcrypt==5.0.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/GH05TCREW/pentestagent"
+Homepage = "https://github.com/timfewi/memorycreep"
+Repository = "https://github.com/timfewi/memorycreep"
+Upstream = "https://github.com/GH05TCREW/pentestagent"
 
 [project.scripts]
+memorycreep = "pentestagent.interface.main:main"
+memorycreep-host = "pentestagent.host_cli:main"
+memorycreep-broker = "pentestagent.broker:main"
+memorycreep-guest = "pentestagent.guest_launcher:main"
+memorycreep-guest-setup = "pentestagent.guest_setup:main"
 pentestagent = "pentestagent.interface.main:main"
+pta = "pentestagent.host_cli:main"
+pentestagent-broker = "pentestagent.broker:main"
+pentestagent-guest = "pentestagent.guest_launcher:main"
+pentestagent-guest-setup = "pentestagent.guest_setup:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -133,7 +142,7 @@ exclude_lines = [
 
 [tool.black]
 line-length = 88
-target-version = ["py310", "py311", "py312"]
+target-version = ["py312"]
 include = '\.pyi?$'
 
 [tool.isort]
@@ -143,7 +152,7 @@ known_first_party = ["pentestagent"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py312"
 
 exclude = ["third_party/"]
 
@@ -161,7 +170,7 @@ ignore = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true

@@ -97,3 +97,17 @@ loot/*
 /conversations
 mcp_examples/kali/mcp_servers.json
 pentestagent/mcp/mcp_servers.json
+
+# Nix/Direnv and host-private deployment state
+.direnv/
+result
+result-*
+nix/hosts/hardware.nix
+nix/config/windows-manifest.json
+/deployment-secrets/
+/fido2-enrollment/
+/project-volumes/
+/vm-overlays/
+/malware-scratch/
+/windows-images/
+/session-audit/

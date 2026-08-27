@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  echo "usage: install-host --disk /dev/DEVICE --flake PATH --age-key FILE --providers FILE" >&2
+  exit 2
+}
+
+disk=
+flake_path=
+age_key=
+providers=
+while (( $# )); do
+  case "$1" in
+    --disk) disk=${2:?}; shift 2 ;;
+    --flake) flake_path=${2:?}; shift 2 ;;
+    --age-key) age_key=${2:?}; shift 2 ;;
+    --providers) providers=${2:?}; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+[[ $EUID -eq 0 ]] || { echo "run as root" >&2; exit 1; }
+[[ -b $disk ]] || { echo "not a block device: $disk" >&2; exit 1; }
+[[ -e $flake_path/flake.nix ]] || { echo "flake.nix not found" >&2; exit 1; }
+[[ -f $age_key && ! -L $age_key ]] || { echo "invalid age key" >&2; exit 1; }
+[[ -f $providers && ! -L $providers ]] || { echo "invalid encrypted providers file" >&2; exit 1; }
+[[ -d /sys/firmware/efi ]] || { echo "installer was not booted in UEFI mode" >&2; exit 1; }
+
+echo "THIS ERASES ALL DATA ON $disk."
+read -r -p "Type the exact device path to continue: " confirmed
+[[ $confirmed == "$disk" ]] || { echo "confirmation did not match" >&2; exit 1; }
+
+cleanup() {
+  set +e
+  umount -R /mnt 2>/dev/null
+  cryptsetup close cryptroot 2>/dev/null
+}
+trap cleanup EXIT
+
+sgdisk --zap-all "$disk"
+sgdisk --new=1:1MiB:+1GiB --typecode=1:ef00 --change-name=1:ESP "$disk"
+sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:cryptroot "$disk"
+partprobe "$disk"
+udevadm settle
+
+esp=/dev/disk/by-partlabel/ESP
+crypt_part=/dev/disk/by-partlabel/cryptroot
+[[ -b $esp && -b $crypt_part ]] || { echo "partition labels not found" >&2; exit 1; }
+
+cryptsetup luksFormat --type luks2 --pbkdf argon2id "$crypt_part"
+cryptsetup open "$crypt_part" cryptroot
+systemd-cryptenroll --fido2-device=auto "$crypt_part"
+echo "The next command prints a recovery key. Store it offline, never on this host."
+systemd-cryptenroll --recovery-key "$crypt_part"
+read -r -p "Confirm that the recovery key is stored offline [yes]: " recovery_saved
+[[ $recovery_saved == yes ]] || { echo "recovery-key confirmation required" >&2; exit 1; }
+
+mkfs.btrfs -f -L pta-root /dev/mapper/cryptroot
+mkfs.fat -F 32 -n ESP "$esp"
+mount /dev/mapper/cryptroot /mnt
+btrfs subvolume create /mnt/root
+btrfs subvolume create /mnt/persist
+umount /mnt
+
+mount -o subvol=root,compress=zstd,noatime /dev/mapper/cryptroot /mnt
+mkdir -p /mnt/persist /mnt/boot
+mount -o subvol=persist,compress=zstd,noatime /dev/mapper/cryptroot /mnt/persist
+mount -o umask=0077,noexec,nodev,nosuid "$esp" /mnt/boot
+
+install -d -m 0700 /mnt/persist/{broker,identity,keys,secrets,secureboot,microvms,pentestagent}
+install -d -m 0755 /mnt/persist/system/nixos
+install -m 0600 "$age_key" /mnt/persist/keys/sops-age
+install -m 0600 "$providers" /mnt/persist/secrets/providers.yaml
+echo "Choose the local operator password:"
+mkpasswd -m yescrypt > /mnt/persist/identity/operator-password-hash
+chmod 0600 /mnt/persist/identity/operator-password-hash
+
+install -d -m 0700 /var/lib/sbctl
+sbctl create-keys
+cp -a /var/lib/sbctl/. /mnt/persist/secureboot/
+
+for pair in   "broker:/var/lib/pentestagent-broker"   "pentestagent:/var/lib/pentestagent"   "microvms:/var/lib/microvms"   "system/nixos:/var/lib/nixos"   "secureboot:/var/lib/sbctl"
+do
+  source_dir=${pair%%:*}
+  target_dir=${pair#*:}
+  install -d -m 0700 "/mnt$target_dir"
+  mount --bind "/mnt/persist/$source_dir" "/mnt$target_dir"
+done
+
+nixos-install --root /mnt --flake "$flake_path#memorycreep-workstation" --no-root-passwd
+
+echo "Installation complete. Keep Secure Boot disabled for the first boot."
+echo "After verifying the recovery key, enter firmware Setup Mode and run:"
+echo "  sudo sbctl enroll-keys --microsoft"
+echo "  sudo nixos-rebuild boot --flake <trusted-source>#memorycreep-workstation"

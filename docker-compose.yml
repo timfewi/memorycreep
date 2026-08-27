@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: pentestagent:latest
+    image: memorycreep:0.2.0
     container_name: pentestagent
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -24,10 +24,13 @@ services:
       context: .
       dockerfile: Dockerfile.kali
     container_name: pentestagent-kali
-    privileged: true  # Required for VPN and some tools. NOTE: this is risky on shared hosts; prefer running inside a disposable VM.
+    # Legacy compatibility only. Run inside a disposable VM; never privileged.
+    cap_drop:
+      - ALL
     cap_add:
       - NET_ADMIN
-      - SYS_ADMIN
+    security_opt:
+      - no-new-privileges:true
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-}
@@ -53,10 +56,12 @@ services:
       context: .
       dockerfile: Dockerfile.kali
     container_name: pentestagent-kali-arm64
-    privileged: true
+    cap_drop:
+      - ALL
     cap_add:
       - NET_ADMIN
-      - SYS_ADMIN
+    security_opt:
+      - no-new-privileges:true
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-}

@@ -58,6 +58,21 @@ class TestApplyApiBase:
         llm._apply_api_base(kwargs)
         assert kwargs["api_base"] == "https://relay.example/v1"
 
+    def test_broker_token_is_read_from_file_not_environment(
+        self, tmp_path, monkeypatch
+    ):
+        token_file = tmp_path / "broker-token"
+        token_file.write_text("session-token\n", encoding="utf-8")
+        monkeypatch.setenv("PENTESTAGENT_BROKER_TOKEN_FILE", str(token_file))
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        llm = self._make_llm("gpt-5", "http://169.254.77.1:17443/v1")
+        kwargs = {"model": "gpt-5"}
+
+        llm._apply_api_base(kwargs)
+
+        assert kwargs["api_key"] == "session-token"
+        assert "OPENAI_API_KEY" not in os.environ
+
     def test_no_injection_when_api_base_is_none(self):
         llm = self._make_llm("openai/my-model", None)
         kwargs = {"model": "openai/my-model"}

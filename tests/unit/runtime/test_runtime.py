@@ -203,6 +203,19 @@ class TestLocalRuntimeExecuteCommand:
         await runtime.stop()
 
     @pytest.mark.asyncio
+    async def test_command_environment_drops_credentials(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("OPENAI_API_KEY", "must-not-reach-shell")
+        monkeypatch.setenv("PENTESTAGENT_BROKER_TOKEN", "must-not-reach-shell")
+        runtime = LocalRuntime()
+        await runtime.start()
+
+        result = await runtime.execute_command("env")
+
+        assert "must-not-reach-shell" not in result.stdout
+        await runtime.stop()
+
+    @pytest.mark.asyncio
     async def test_command_result_type(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         runtime = LocalRuntime()

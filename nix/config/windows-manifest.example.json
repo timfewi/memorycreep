@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "image": "/var/lib/pentestagent/windows/windows-11.qcow2",
+  "format": "qcow2",
+  "sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGITS",
+  "license_note": "The operator must supply and license this image outside the Nix store."
+}

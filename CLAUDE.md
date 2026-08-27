@@ -1,21 +1,22 @@
-# PentestAgent — CLAUDE.md
+# MemoryCreep — CLAUDE.md
 
 ## Project overview
 
-**PentestAgent** (v0.2.0) is an AI-powered penetration testing framework built in Python.
-It wraps LiteLLM to support any provider (Anthropic, OpenAI, etc.) and exposes a TUI,
-a CLI, and an MCP server interface. The agent can run tools locally or inside a Docker
-sandbox (base or Kali image).
+**MemoryCreep** (v0.2.0) is an AI-powered penetration testing framework built in Python.
+It wraps LiteLLM to support multiple providers and exposes a TUI, CLI, and MCP
+server interface. The supported hardened product runs the policy-bound agent inside
+a Cloud Hypervisor MicroVM on NixOS; local and Docker execution are legacy
+development modes and are not host security boundaries.
 
 ## Tech stack
 
-- **Python 3.10+**, packaged with Hatchling (`pyproject.toml`)
+- **Python 3.12**, packaged with Hatchling (`pyproject.toml`) and Nix
 - **LiteLLM** — provider-agnostic LLM wrapper
 - **Textual** — TUI framework (`pentestagent/interface/`)
 - **Typer** — CLI framework
 - **Playwright** — browser tool
 - **MCP (Model Context Protocol)** — both client (consuming external servers) and server
-  (exposing PentestAgent to Claude Desktop / Cursor / etc.)
+  (exposing MemoryCreep to Claude Desktop / Cursor / etc.)
 - **FAISS + sentence-transformers** — optional RAG engine (`pip install -e ".[rag]"`)
 
 ## Repository layout
@@ -94,9 +95,9 @@ pentestagent mcp_server --type stdio   # Expose as MCP server (STDIO)
 pentestagent mcp_server --type sse     # Expose as MCP server (HTTP/SSE, port 8080)
 ```
 
-## PentestAgent as MCP server
+## MemoryCreep as MCP server
 
-PentestAgent can expose itself as an MCP server so any MCP-compatible client
+MemoryCreep can expose itself as an MCP server so any MCP-compatible client
 (Claude Desktop, Cursor, etc.) can drive it programmatically.
 
 ### Transports

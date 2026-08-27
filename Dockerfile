@@ -1,9 +1,9 @@
-# PentestAgent - AI Penetration Testing Agent
+# MemoryCreep - AI Penetration Testing Agent
 # Base image with common tools
 
-FROM python:3.14-slim
+FROM python:3.12.11-slim-bookworm
 
-LABEL maintainer="PentestAgent"
+LABEL maintainer="MemoryCreep"
 LABEL description="AI penetration testing"
 
 # Set environment variables

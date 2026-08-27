@@ -1,4 +1,4 @@
-﻿# PentestAgent PowerShell Setup Script
+﻿# MemoryCreep PowerShell Setup Script
 
 Write-Host "=================================================================="
 Write-Host "                        PENTESTAGENT"
@@ -57,7 +57,7 @@ Write-Host "[OK] Playwright browsers installed"
 if (-not (Test-Path ".env")) {
     Write-Host "Creating .env file..."
     @"
-# PentestAgent Configuration
+# MemoryCreep Configuration
 
 # API Keys (set at least one for chat model)
 OPENAI_API_KEY=
@@ -117,5 +117,5 @@ Write-Host ""
 Write-Host "To get started:"
 Write-Host "  1. Edit .env and add your API keys"
 Write-Host "  2. Activate: .\venv\Scripts\Activate.ps1"
-Write-Host "  3. Run: pentestagent or python -m pentestagent"
+Write-Host "  3. Run MemoryCreep: memorycreep (legacy: pentestagent)"
 Write-Host ""

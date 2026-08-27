@@ -1,4 +1,4 @@
-"""Test fixtures for PentestAgent tests."""
+"""Test fixtures for MemoryCreep tests."""
 
 import asyncio
 from pathlib import Path

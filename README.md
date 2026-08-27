@@ -1,29 +1,68 @@
 <div align="center">
 
-<img src="assets/pentestagent-logo.png" alt="PentestAgent Logo" width="220" style="margin-bottom: 20px;"/>
+# MemoryCreep
 
-# PentestAgent
-### AI Penetration Testing
+### Hardened AI-assisted security testing on NixOS
 
-<a href="https://trendshift.io/repositories/15897?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-15897" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/15897" alt="GH05TCREW%2Fpentestagent | Trendshift" width="250" height="55"/></a>
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt) [![Version](https://img.shields.io/badge/Version-0.2.0-orange.svg)](https://github.com/GH05TCREW/pentestagent/releases) [![Security](https://img.shields.io/badge/Security-Penetration%20Testing-red.svg)](https://github.com/GH05TCREW/pentestagent) [![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://github.com/GH05TCREW/pentestagent)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.txt)
+[![Version](https://img.shields.io/badge/Version-0.2.0-orange.svg)](https://github.com/timfewi/memorycreep/releases)
+[![Security](https://img.shields.io/badge/Security-Policy--Bound-red.svg)](docs/nixos-workstation.md)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://github.com/timfewi/memorycreep)
 
 </div>
 
-https://github.com/user-attachments/assets/a67db2b5-672a-43df-b709-149c8eaee975
+MemoryCreep is an independent project derived from PentestAgent. It is not
+affiliated with or endorsed by the original maintainers. See
+[the repository guide](docs/repository-guide.md) and
+[the upstream policy](UPSTREAM.md).
 
 ## Requirements
 
-- Python 3.10+
-- API key for OpenAI, Anthropic, or other LiteLLM-supported provider
+The hardened product targets an x86_64 machine with UEFI, KVM, at least eight
+CPU cores, and 32 GiB RAM. Python is fixed to the 3.12 series. Provider keys
+stay on the NixOS host and are exposed to the Pentest VM only through the
+session-scoped broker.
+
+## Hardened NixOS workstation
+
+The supported security architecture is a minimal NixOS 26.05 host plus
+Cloud-Hypervisor MicroVMs. The host has no agent, pentest tools, Docker daemon,
+project mount, or free-shell execution path. Exact scope is enforced by
+host-side nftables after local confirmation.
+
+```bash
+# Evaluate every host and guest, then build the installer.
+nix flake check
+nix build .#memorycreep
+nix build .#installer-iso
+
+# On an installed workstation:
+sudo pta start pentest --project customer-a --scope 192.0.2.0/24 --net offline
+sudo pta start pentest --project customer-a --scope target.example --net vpn
+sudo pta start malware --guest linux --sample ./sample.bin
+sudo pta status
+sudo pta export --project malware-quarantine
+sudo pta stop
+```
+
+See [the workstation deployment and recovery guide](docs/nixos-workstation.md).
+The hardware-specific interface and kernel values live separately in
+`nix/hosts/hardware-example.nix`; secrets, Secure Boot keys, project volumes,
+VM overlays, audit logs, FIDO2 enrollment data, and Windows images are never
+stored in Git or the Nix store.
+
+## Legacy development install
+
+The following setup is retained for development on non-product machines. It is
+not the hardened workstation and must not be used as a host security boundary.
 
 ## Install
 
 ```bash
 # Clone
-git clone https://github.com/GH05TCREW/pentestagent.git
-cd pentestagent
+git clone https://github.com/timfewi/memorycreep.git
+cd memorycreep
 
 # Setup (creates venv, installs deps)
 .\scripts\setup.ps1   # Windows
@@ -57,7 +96,7 @@ Any [LiteLLM-supported model](https://docs.litellm.ai/docs/providers) works.
 
 ### Using a relay / custom API base
 
-Point PentestAgent at any OpenAI-compatible endpoint via `OPENAI_API_BASE`:
+Point MemoryCreep at any OpenAI-compatible endpoint via `OPENAI_API_BASE`:
 
 ```bash
 OPENAI_API_KEY=your-relay-token
@@ -71,14 +110,16 @@ See `.env.example` for full provider notes and embedding options.
 ## Run
 
 ```bash
-pentestagent                      # Launch TUI
-pentestagent -t 192.168.1.1       # Launch with target
-pentestagent tui --docker         # Run tools in Docker container
+memorycreep                      # Launch TUI
+memorycreep -t 192.168.1.1       # Launch with target
+memorycreep tui --docker         # Run tools in Docker container
+
+# The legacy `pentestagent` command remains available for compatibility.
 ```
 
-## Docker
+## Docker (legacy compatibility only)
 
-Run tools inside a Docker container for isolation and pre-installed pentesting tools.
+Docker mode is retained for development compatibility. It is not used by the NixOS product and is not a security boundary equivalent to the MicroVM policy.
 
 ### Option 1: Pull pre-built image (fastest)
 
@@ -87,12 +128,12 @@ Run tools inside a Docker container for isolation and pre-installed pentesting t
 docker run -it --rm \
   -e ANTHROPIC_API_KEY=your-key \
   -e PENTESTAGENT_MODEL=claude-sonnet-4-20250514 \
-  ghcr.io/gh05tcrew/pentestagent:latest
+  ghcr.io/timfewi/memorycreep:0.2.0
 
 # Kali image with metasploit, sqlmap, hydra, etc.
 docker run -it --rm \
   -e ANTHROPIC_API_KEY=your-key \
-  ghcr.io/gh05tcrew/pentestagent:kali
+  ghcr.io/timfewi/memorycreep:kali-0.2.0
 ```
 
 ### Option 2: Build locally
@@ -109,13 +150,13 @@ docker compose --profile kali build
 docker compose --profile kali run --rm pentestagent-kali
 ```
 
-The container runs PentestAgent with access to Linux pentesting tools. The agent can use `nmap`, `msfconsole`, `sqlmap`, etc. directly via the terminal tool.
+The container runs MemoryCreep with access to Linux pentesting tools. The agent can use `nmap`, `msfconsole`, `sqlmap`, etc. directly via the terminal tool.
 
 Requires Docker to be installed and running.
 
 ## Modes
 
-PentestAgent has three modes, accessible via commands in the TUI:
+MemoryCreep has three modes, accessible via commands in the TUI:
 
 | Mode | Command | Description |
 |------|---------|-------------|
@@ -136,6 +177,10 @@ PentestAgent has three modes, accessible via commands in the TUI:
 /notes            Show saved notes
 /report           Generate report from session
 /memory           Show token/memory usage
+/scope            Show immutable host-confirmed scope
+/approvals        List, approve, or deny high-risk actions
+/network          Show the active offline/vpn/lan profile
+/vm-status        Show the policy and MicroVM runtime state
 /prompt           Show system prompt
 /conversations    Browse and restore saved conversations
 /mcp <list/add>   Visualizes or adds a new MCP server.
@@ -152,19 +197,19 @@ Press `Esc` to stop a running agent. `Ctrl+Q` to quit.
 
 ## Playbooks
 
-PentestAgent includes prebuilt **attack playbooks** for black-box security testing. Playbooks define a structured approach to specific security assessments.
+MemoryCreep includes prebuilt **attack playbooks** for black-box security testing. Playbooks define a structured approach to specific security assessments.
 
 **Run a playbook:**
 
 ```bash
-pentestagent run -t example.com --playbook thp3_web
+memorycreep run -t example.com --playbook thp3_web
 ```
 
 ![Playbook Demo](assets/playbook.gif)
 
 ## Tools
 
-PentestAgent includes built-in tools and supports MCP (Model Context Protocol) for extensibility.
+MemoryCreep includes built-in tools and supports MCP (Model Context Protocol) for extensibility.
 
 **Built-in tools:** `terminal`, `browser`, `notes`, `web_search` (requires `TAVILY_API_KEY`), `spawn_mcp_agent`
 
@@ -172,7 +217,10 @@ PentestAgent includes built-in tools and supports MCP (Model Context Protocol) f
 
 `spawn_mcp_agent` is a built-in tool that allows a running agent to spawn a child copy of itself as a subordinate MCP server connected over stdio. The child process is fully isolated — its own runtime, LLM client, conversation history, and notes store — and its complete tool set is injected back into the parent agent's available tools after spawning.
 
-This enables hierarchical, multi-agent workflows without any external orchestration: the agent self-organises by delegating scoped subtasks to children it spawns on demand.
+This legacy development feature enables hierarchical workflows on non-product
+machines. It is disabled inside the hardened Pentest VM because a subprocess
+would otherwise own a separate approval store and audit chain; use `/crew`
+there, whose workers share the exact session policy and runtime.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -246,7 +294,7 @@ Terminates the child agent identified by `server_name` (e.g. `child_agent_1`), r
 
 ### MCP RAG Tool Optimizer
 
-When an MCP server exposes more than 128 tools, PentestAgent automatically replaces the full catalogue with a single `mcp_<server>_rag_optimizer` tool. This meta-tool uses embedding similarity (via LiteLLM, default `text-embedding-3-small`) to retrieve the most relevant tools for the task at hand and injects them into the agent's next turn — keeping the context window manageable without losing access to the full tool set.
+When an MCP server exposes more than 128 tools, MemoryCreep automatically replaces the full catalogue with a single `mcp_<server>_rag_optimizer` tool. This meta-tool uses embedding similarity (via LiteLLM, default `text-embedding-3-small`) to retrieve the most relevant tools for the task at hand and injects them into the agent's next turn — keeping the context window manageable without losing access to the full tool set.
 
 The optimizer is transparent to the agent: it calls the RAG tool with focused natural-language queries describing what it needs, and the matching tools become available on the next turn to call directly.
 
@@ -263,13 +311,13 @@ Embeddings are computed once at startup and cached, so repeated queries are fast
 
 ### MCP Integration
 
-PentestAgent supports MCP (Model Context Protocol) in two directions: **consuming** external MCP servers as tool sources, and **exposing itself** as an MCP server so external clients (Claude Desktop, Cursor, etc.) can drive PentestAgent programmatically.
+MemoryCreep supports MCP (Model Context Protocol) in two directions: **consuming** external MCP servers as tool sources, and **exposing itself** as an MCP server so external clients (Claude Desktop, Cursor, etc.) can drive MemoryCreep programmatically.
 
 ---
 
 #### Consuming External MCP Servers (Client Mode)
 
-Configure `mcp_servers.json` to connect PentestAgent to any external MCP servers. Example config:
+Configure `mcp_servers.json` to connect MemoryCreep to any external MCP servers. Example config:
 
 ```json
 {
@@ -287,24 +335,24 @@ Configure `mcp_servers.json` to connect PentestAgent to any external MCP servers
 
 ---
 
-#### Exposing PentestAgent as an MCP Server (Server Mode)
+#### Exposing MemoryCreep as an MCP Server (Server Mode)
 
-PentestAgent can run as an MCP server, allowing any MCP-compatible client to submit tasks, inspect results, and control the agent remotely. Two transports are supported:
+MemoryCreep can run as an MCP server, allowing any MCP-compatible client to submit tasks, inspect results, and control the agent remotely. Two transports are supported:
 
 **STDIO** — for local clients (e.g. Claude Desktop, Cursor):
 
 ```bash
-pentestagent mcp_server --type stdio
-pentestagent mcp_server --type stdio --target 192.168.1.1 --scope 192.168.1.0/24
-pentestagent mcp_server --type stdio --model claude-sonnet-4-20250514 --docker
+memorycreep mcp_server --type stdio
+memorycreep mcp_server --type stdio --target 192.168.1.1 --scope 192.168.1.0/24
+memorycreep mcp_server --type stdio --model claude-sonnet-4-20250514 --docker
 ```
 
 **SSE (HTTP)** — for remote or networked clients:
 
 ```bash
-pentestagent mcp_server --type sse
-pentestagent mcp_server --type sse --host 0.0.0.0 --port 8080
-pentestagent mcp_server --type sse --target 10.0.0.1 --scope 10.0.0.0/24 --docker
+memorycreep mcp_server --type sse
+memorycreep mcp_server --type sse --host 0.0.0.0 --port 8080
+memorycreep mcp_server --type sse --target 10.0.0.1 --scope 10.0.0.0/24 --docker
 ```
 
 The SSE transport exposes a single `/mcp` endpoint supporting `POST` (requests), `GET` (persistent SSE stream for server-initiated push), and `DELETE` (session teardown). Sessions are tracked via the `Mcp-Session-Id` header.
@@ -328,8 +376,8 @@ The SSE transport exposes a single `/mcp` endpoint supporting `POST` (requests),
 ```json
 {
   "mcpServers": {
-    "pentestagent": {
-      "command": "pentestagent",
+    "memorycreep": {
+      "command": "memorycreep",
       "args": ["mcp_server", "--type", "stdio"]
     }
   }
@@ -340,7 +388,7 @@ The SSE transport exposes a single `/mcp` endpoint supporting `POST` (requests),
 
 #### MCP Server Tools Reference
 
-When acting as an MCP server, PentestAgent exposes the following tools:
+When acting as an MCP server, MemoryCreep exposes the following tools:
 
 **Server Status & Config**
 
@@ -428,11 +476,11 @@ get_task_result  task_id="<id2>"
 ### CLI Tool Management
 
 ```bash
-pentestagent tools list         # List all tools
-pentestagent tools info <name>  # Show tool details
-pentestagent mcp list           # List MCP servers
-pentestagent mcp add <name> <command> [args...]  # Add MCP server
-pentestagent mcp test <name>    # Test MCP connection
+memorycreep tools list         # List all tools
+memorycreep tools info <name>  # Show tool details
+memorycreep mcp list           # List MCP servers
+memorycreep mcp add <name> <command> [args...]  # Add MCP server
+memorycreep mcp test <name>    # Test MCP connection
 ```
 
 ## Conversation History Controls
@@ -456,7 +504,7 @@ This lets you try an alternative approach from any point while keeping the origi
 
 ## Conversation History
 
-PentestAgent automatically persists every conversation so you can review, compare, and restore past sessions.
+MemoryCreep automatically persists every conversation so you can review, compare, and restore past sessions.
 
 **Auto-save** triggers after each `/assist`, `/agent`, `/crew`, and `/interact` task, and before `/clear`. Up to 20 conversations are kept; older ones are pruned automatically.
 

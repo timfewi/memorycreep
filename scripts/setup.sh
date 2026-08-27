@@ -1,5 +1,5 @@
 #!/bin/bash
-# PentestAgent Setup Script
+# MemoryCreep Setup Script
 
 set -e
 
@@ -66,7 +66,7 @@ echo "[OK] Clipboard utilities check done"
 if [ ! -f ".env" ]; then
     echo "Creating .env file..."
     cat > .env << EOF
-# PentestAgent Configuration
+# MemoryCreep Configuration
 
 # API Keys (set at least one for chat model)
 OPENAI_API_KEY=
@@ -124,7 +124,7 @@ echo ""
 echo "To get started:"
 echo "  1. Edit .env and add your API keys"
 echo "  2. Activate the virtual environment: source venv/bin/activate"
-echo "  3. Run PentestAgent: pentestagent or python -m pentestagent"
+echo "  3. Run MemoryCreep: memorycreep (legacy: pentestagent)"
 echo ""
 echo "For Docker usage:"
 echo "  docker-compose up pentestagent"

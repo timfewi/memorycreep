@@ -1,4 +1,4 @@
-FROM ghcr.io/gh05tcrew/pentestagent:latest
+FROM ghcr.io/timfewi/memorycreep:0.2.0
 
 RUN git clone https://github.com/Wh0am123/MCP-Kali-Server.git
 

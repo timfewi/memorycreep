@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+python_bin=
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    python_bin=$(command -v "$candidate")
+    break
+  fi
+done
+[[ -n $python_bin ]] || { echo "Python is required" >&2; exit 1; }
+
+cache_dir=$(mktemp -d)
+trap 'rm -rf "$cache_dir"' EXIT
+PYTHONPYCACHEPREFIX="$cache_dir" "$python_bin" -m compileall -q pentestagent tests
+
+"$python_bin" - <<'PY'
+from __future__ import annotations
+
+import os
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+root = Path(".")
+failures: list[str] = []
+
+
+def fail(message: str) -> None:
+    failures.append(message)
+
+
+required = [
+    "flake.nix",
+    ".envrc",
+    "nix/hosts/dedicated.nix",
+    "nix/guests/pentest.nix",
+    "nix/guests/malware-controller.nix",
+    "nix/guests/linux-detonation.nix",
+    "nix/pkgs/wasmtime-38.nix",
+    "pentestagent/runtime/policy.py",
+    "pentestagent/runtime/factory.py",
+    "pentestagent/host_cli.py",
+    "pentestagent/broker.py",
+    "docs/repository-guide.md",
+    "UPSTREAM.md",
+    "NOTICE",
+]
+for name in required:
+    if not (root / name).is_file():
+        fail(f"required source is missing: {name}")
+
+text_extensions = {
+    ".nix",
+    ".py",
+    ".toml",
+    ".yml",
+    ".yaml",
+    ".json",
+    ".md",
+    ".sh",
+    "",
+}
+texts: dict[Path, str] = {}
+for path in root.rglob("*"):
+    if not path.is_file() or path.is_symlink():
+        continue
+    if {".git", ".direnv"} & set(path.parts):
+        continue
+    if path.suffix.lower() not in text_extensions:
+        continue
+    try:
+        texts[path] = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
+
+latest_tag = ":" + "latest"
+privileged_true = "privileged:" + " true"
+for path, text in texts.items():
+    if latest_tag in text:
+        fail(f"unversioned container tag in {path}")
+    if privileged_true in text.lower():
+        fail(f"privileged container in {path}")
+
+compose = texts.get(Path("docker-compose.yml"), "")
+old_upstream_image = "ghcr.io/gh05tcrew/" + "pentestagent"
+if old_upstream_image in "\n".join(texts.values()):
+    fail("an active container reference still points at the old upstream image")
+if "SYS_ADMIN" in compose:
+    fail("legacy Docker compose must not grant SYS_ADMIN")
+if re.search(r"cap_add:\s*\n(?:\s*-\s*(?!NET_ADMIN)\S+\s*\n)+", compose):
+    fail("legacy Docker compose has an unexpected capability")
+
+flake = texts.get(Path("flake.nix"), "")
+if "memorycreep = pentestagent;" not in flake:
+    fail("the public MemoryCreep flake package alias is missing")
+constants = texts.get(Path("pentestagent/config/constants.py"), "")
+if 'APP_NAME = "MemoryCreep"' not in constants:
+    fail("the runtime display name is not MemoryCreep")
+pinned_repositories = {
+    repository
+    for repository, _revision in re.findall(
+        r'url\s*=\s*"github:([^"]+)/([0-9a-f]{40})"', flake
+    )
+}
+expected_repositories = {
+    "NixOS/nixpkgs",
+    "microvm-nix/microvm.nix",
+    "nix-community/lanzaboote",
+    "Mic92/sops-nix",
+    "pyproject-nix/uv2nix",
+    "pyproject-nix/pyproject.nix",
+}
+for repository in sorted(expected_repositories - pinned_repositories):
+    fail(f"flake input is not pinned to a commit: {repository}")
+
+project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+if project["project"].get("name") != "memorycreep":
+    fail("the public Python distribution must be named memorycreep")
+project_scripts = project["project"].get("scripts", {})
+if project_scripts.get("memorycreep") != "pentestagent.interface.main:main":
+    fail("the preferred MemoryCreep CLI entry point is missing")
+if project_scripts.get("pentestagent") != "pentestagent.interface.main:main":
+    fail("the legacy pentestagent CLI compatibility entry point is missing")
+if project["project"].get("requires-python") != ">=3.12,<3.13":
+    fail("the product Python interpreter must be fixed to the 3.12 series")
+groups = {
+    "dependencies": project["project"].get("dependencies", []),
+    **project["project"].get("optional-dependencies", {}),
+}
+for group, requirements in groups.items():
+    for requirement in requirements:
+        if requirement.startswith("memorycreep["):
+            continue
+        if "==" not in requirement:
+            fail(f"unfixed Python dependency in {group}: {requirement}")
+for requirement in project.get("build-system", {}).get("requires", []):
+    if "==" not in requirement:
+        fail(f"unfixed Python build dependency: {requirement}")
+
+shell_calls = []
+local_runtime_calls = []
+for path, text in texts.items():
+    if path.suffix != ".py" or "tests" in path.parts:
+        continue
+    if "create_subprocess_shell" in text:
+        shell_calls.append(str(path))
+    if "LocalRuntime(" in text and path not in {
+        Path("pentestagent/runtime/factory.py"),
+        Path("pentestagent/runtime/runtime.py"),
+    }:
+        local_runtime_calls.append(str(path))
+if shell_calls != ["pentestagent/runtime/runtime.py"]:
+    fail(f"unexpected free-shell implementation sites: {shell_calls}")
+if local_runtime_calls:
+    fail(f"runtime construction bypasses RuntimeFactory: {local_runtime_calls}")
+
+guest_launcher = texts.get(Path("pentestagent/guest_launcher.py"), "")
+if '"OPENAI_API_KEY"' in guest_launcher or '"PENTESTAGENT_BROKER_TOKEN"' in guest_launcher:
+    fail("the guest launcher must not place broker credentials in the environment")
+if '"PENTESTAGENT_BROKER_TOKEN_FILE"' not in guest_launcher:
+    fail("the guest launcher does not expose the broker credential file")
+
+nix_text = "\n".join(
+    text for path, text in texts.items() if path.suffix == ".nix"
+)
+if re.search(r"sk-[A-Za-z0-9_-]{16,}", nix_text):
+    fail("credential-like plaintext appears in Nix sources")
+wasm_sandbox = texts.get(Path("pentestagent/wasm_sandbox.py"), "")
+if "wasmtime 38." not in wasm_sandbox:
+    fail("Wasmtime runtime version is not fixed to v38")
+if "memfd_create" not in wasm_sandbox or "F_ADD_SEALS" not in wasm_sandbox:
+    fail("WASM components are not executed from a sealed hash-bound snapshot")
+if 'version = "38.0.4"' not in texts.get(Path("nix/pkgs/wasmtime-38.nix"), ""):
+    fail("Wasmtime Nix package is not fixed to 38.0.4")
+
+pentest_guest = texts.get(Path("nix/guests/pentest.nix"), "")
+if re.search(r"cap_sys_admin|CAP_SYS_ADMIN", pentest_guest, re.IGNORECASE):
+    fail("the pentest guest must not grant CAP_SYS_ADMIN")
+if "setuid = true" in pentest_guest or "setgid = true" in pentest_guest:
+    fail("the pentest guest must not contain setuid or setgid wrappers")
+tui_start = pentest_guest.find("    pentestagent-tui = {")
+tui_end = pentest_guest.find(
+    '  systemd.services."serial-getty@ttyS0"', tui_start
+)
+if tui_start < 0 or tui_end < 0:
+    fail("pentest TUI service definition is missing")
+    pentest_tui = ""
+else:
+    pentest_tui = pentest_guest[tui_start:tui_end]
+if "NoNewPrivileges = true;" not in pentest_tui:
+    fail("pentest TUI must prevent later privilege gains")
+for directive in ("CapabilityBoundingSet", "AmbientCapabilities"):
+    capabilities = re.search(
+        rf"{directive}\s*=\s*\[(.*?)\];", pentest_tui, re.DOTALL
+    )
+    if not capabilities:
+        fail(f"pentest TUI {directive} is missing")
+        continue
+    allowed_capabilities = set(
+        re.findall(r'"(CAP_[A-Z0-9_]+)"', capabilities.group(1))
+    )
+    if allowed_capabilities != {"CAP_NET_ADMIN", "CAP_NET_RAW"}:
+        fail(f"unexpected pentest TUI {directive}: {sorted(allowed_capabilities)}")
+
+usage_path = "/var/lib/pentestagent-broker/usage.json"
+for path in (
+    Path("pentestagent/broker.py"),
+    Path("nix/modules/broker.nix"),
+):
+    if usage_path not in texts.get(path, ""):
+        fail(f"persistent broker accounting is not wired in {path}")
+if "/persist/broker" not in texts.get(Path("nix/modules/persistence.nix"), ""):
+    fail("broker usage accounting is not on encrypted persistent storage")
+
+host_hardening = texts.get(Path("nix/modules/hardening.nix"), "")
+for interface in ("pta-lab", "pta-lab-ctrl", "pta-lab-linux", "pta-lab-windows"):
+    if interface not in host_hardening:
+        fail(f"malware-lab host isolation is missing interface {interface}")
+
+if failures:
+    for message in failures:
+        print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+print("source policy checks passed")
+PY

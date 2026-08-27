@@ -40,7 +40,6 @@ jobs:
             images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
             tags: |
               type=semver,pattern={{version}}
-              type=raw,value=latest
       
       - name: Build and push base image
         uses: docker/build-push-action@v7
@@ -82,7 +81,7 @@ jobs:
           context: .
           file: Dockerfile.kali
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:kali
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:kali-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -116,6 +115,6 @@ jobs:
           file: Dockerfile.kali
           push: true
           platforms: linux/arm64
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:kali-arm64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:kali-arm64-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
