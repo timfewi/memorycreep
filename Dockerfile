@@ -1,7 +1,7 @@
 # MemoryCreep - AI Penetration Testing Agent
 # Base image with common tools
 
-FROM python:3.12.11-slim-bookworm
+FROM python:3.14.6-slim-bookworm
 
 LABEL maintainer="MemoryCreep"
 LABEL description="AI penetration testing"
