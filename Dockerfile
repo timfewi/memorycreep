@@ -1,7 +1,7 @@
 # MemoryCreep - AI Penetration Testing Agent
 # Base image with common tools
 
-FROM python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+FROM python:3.14.7-slim-bookworm@sha256:416f0db2a2b561945630cef9877a7ea0581b27449eb9fd9df42f03e1b74b5b63
 
 LABEL maintainer="MemoryCreep"
 LABEL description="AI penetration testing"
