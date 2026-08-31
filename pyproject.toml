@@ -59,7 +59,7 @@ dev = [
     "pytest-cov==7.0.0",
     "pytest-mock==3.14.0",
     "black==26.0.0",
-    "isort==8.0.0",
+    "isort==8.0.1",
     "mypy==1.19.0",
     "ruff==0.15.0",
 ]
