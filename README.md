@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="assets/memorycreep-banner.png" alt="MemoryCreep logo" width="480">
-
-# MemoryCreep
+<img src="assets/memorycreep-banner.png" alt="MemoryCreep banner" width="900">
 
 ### Hardened AI-assisted security testing on NixOS
 
