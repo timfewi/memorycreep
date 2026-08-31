@@ -1,0 +1,12 @@
+# SHA-256 allowlist for reviewed, non-executable binary assets.
+# Hashes preserve reviewed bytes; they do not prove that content is benign.
+# Adding or replacing a binary requires an explicit review and manifest update.
+5fbcea8b095885386d9c4afe25b739ef1dc8b78f72fc6b57604c9a09f49024cf  assets/memorycreep-banner.png
+3c3e39d992218f8080a44e49c3351ebc253dc7232173dc510f57e224190c6b93  assets/memorycreep-logo.png
+25af7c216895b89e47d41372c8fc260bdcb99914e0efb4ead91955c0f97983d5  assets/playbook.gif
+6a01ed99c02e27ad4cbfc31fbe2d5dd1a098781095688e5cd46fe2f2dc88872c  mcp_examples/sse/n8n/image-1.png
+c2d243eb23f53ab5f2ac2ca70a84289b12a3511c5a3f06bf64642952d253f0eb  mcp_examples/sse/n8n/image-2.png
+9ee680bd390a84ca377afc76f9f89856eaa5723077f37bdd8a71302b714f1787  mcp_examples/sse/n8n/image-3.png
+1f17c3b693e5bedee7a995a510a6296e4ee470dda5dd589a4901e5c09a02c628  mcp_examples/sse/n8n/image.png
+c6593962894c6da027f1af497e4e11dd9f0a29b87d9ae23dda34ce74d81966cf  mcp_examples/stdio/kali/image-1.png
+f2661a64f636a73570fa429938af70cb9b80a5ce7ab626eae943c376b4bb7c39  mcp_examples/stdio/kali/image.png

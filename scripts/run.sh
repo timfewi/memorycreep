@@ -8,10 +8,8 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-# Load environment variables
-if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+# The application reads .env through python-dotenv. Do not parse secrets in
+# shell code or expose them through an expanded command line.
 
 # Parse arguments
 MODE="cli"
@@ -45,17 +43,17 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Build command
-CMD="python -m pentestagent"
+# Build an argv array so targets cannot change command structure.
+command=(python -m pentestagent)
 
 if [ "$MODE" = "tui" ]; then
-    CMD="$CMD --tui"
+    command+=(--tui)
 fi
 
 if [ -n "$TARGET" ]; then
-    CMD="$CMD --target $TARGET"
+    command+=(--target "$TARGET")
 fi
 
 # Run MemoryCreep
 echo "Starting MemoryCreep..."
-$CMD
+exec "${command[@]}"

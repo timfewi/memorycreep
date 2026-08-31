@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd "$root_dir"
+
+profile=${1:-quick}
+case "$profile" in
+  quick|security|full)
+    ;;
+  -h|--help)
+    cat <<'EOF'
+Usage: bash scripts/test-e2e [quick|security|full]
+
+  quick     offline source policy, formatting, unit/security tests, Semgrep,
+            and Nix evaluation without builds
+  security  quick checks plus integration tests, strict provenance, and OSV
+  full      security checks plus all flake checks and the installer ISO build
+
+This runner never detonates malware or targets pentest systems. The quick
+profile is network-free after the Nix shell is available. Unless OSV_OFFLINE=1
+is set, security and full query the public OSV service. Full can build large VM
+and ISO outputs.
+EOF
+    exit 0
+    ;;
+  *)
+    echo "Unknown E2E profile: $profile" >&2
+    exit 2
+    ;;
+esac
+
+overall_status=0
+
+run_step() {
+  local label=$1
+  shift
+  printf '\n==> %s\n' "$label"
+  "$@"
+  local step_status=$?
+  if ((step_status != 0)); then
+    printf 'FAILED (%s): %s\n' "$step_status" "$label" >&2
+    overall_status=1
+  fi
+}
+
+missing_tool() {
+  local tool=$1
+  printf 'Missing %s. Enter the pinned shell with: nix develop .#all\n' "$tool" >&2
+  overall_status=1
+}
+
+python_bin=
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    python_bin=$(command -v "$candidate")
+    break
+  fi
+done
+
+run_step "offline static security gate" bash scripts/security-scan static
+
+if command -v black >/dev/null 2>&1; then
+  run_step "Black formatting" black --check pentestagent tests
+else
+  missing_tool black
+fi
+
+if command -v ruff >/dev/null 2>&1; then
+  run_step "Ruff lint" ruff check pentestagent tests
+else
+  missing_tool ruff
+fi
+
+if command -v nixfmt >/dev/null 2>&1; then
+  nix_files=()
+  while IFS= read -r -d '' path; do
+    nix_files+=("$path")
+  done < <(find . -path ./.direnv -prune -o -path ./.git -prune -o -name '*.nix' -print0)
+  if (("${#nix_files[@]}" > 0)); then
+    run_step "Nix formatting" nixfmt --check "${nix_files[@]}"
+  fi
+else
+  missing_tool nixfmt
+fi
+
+if [[ -n "$python_bin" ]]; then
+  run_step \
+    "Python unit and security tests" \
+    "$python_bin" -m pytest -q tests/unit tests/security
+  if [[ "$profile" == security || "$profile" == full ]]; then
+    run_step \
+      "Python integration tests" \
+      "$python_bin" -m pytest -q tests/integration
+  fi
+else
+  missing_tool python3
+fi
+
+if [[ "$profile" == security || "$profile" == full ]]; then
+  run_step \
+    "strict provenance and OSV dependency gate" \
+    bash scripts/security-scan dependencies
+fi
+
+if command -v nix >/dev/null 2>&1; then
+  run_step "Nix evaluation" nix flake check --no-build
+  if [[ "$profile" == full ]]; then
+    run_step "full reproducible flake builds" nix flake check --print-build-logs
+    run_step \
+      "installer ISO build" \
+      nix build --no-link --print-build-logs .#installer-iso
+  fi
+else
+  missing_tool nix
+fi
+
+printf '\n'
+if ((overall_status == 0)); then
+  echo "E2E gate passed."
+else
+  echo "E2E gate failed. The failing stages above are release blockers." >&2
+fi
+exit "$overall_status"

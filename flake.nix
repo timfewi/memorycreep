@@ -121,6 +121,20 @@
           touch "$out"
         '';
 
+        security-static = pkgs.runCommand "memorycreep-security-static" {
+          nativeBuildInputs = [
+            pkgs.bash
+            pkgs.python312
+            pkgs.semgrep
+          ];
+        } ''
+          cp -R ${cleanSource} source
+          chmod -R u+w source
+          cd source
+          ${pkgs.bash}/bin/bash scripts/security-scan static
+          touch "$out"
+        '';
+
         python-tests = pkgs.runCommand "memorycreep-python-tests" {
           nativeBuildInputs = [
             pentestagent
@@ -152,22 +166,40 @@
 
       devShells.${system} = {
         default = pkgs.mkShell {
+          inputsFrom = [ pentestagent ];
           packages = [
-            pkgs.uv
-            pkgs.python312
-            pkgs.nixfmt-rfc-style
-            pkgs.ruff
+            pkgs.bash
             pkgs.black
+            pkgs.findutils
+            pkgs.git
+            pkgs.nixfmt-rfc-style
+            pkgs.python312
+            pkgs.python312Packages.pytest
+            pkgs.python312Packages.pytest-asyncio
+            pkgs.python312Packages.pytest-cov
+            pkgs.python312Packages.pytest-mock
+            pkgs.ruff
+            pkgs.uv
+          ];
+        };
+        security = pkgs.mkShell {
+          inputsFrom = [ self.devShells.${system}.default ];
+          packages = [
+            pkgs.osv-scanner
+            pkgs.semgrep
           ];
         };
         all = pkgs.mkShell {
-          inputsFrom = [ self.devShells.${system}.default ];
+          inputsFrom = [
+            self.devShells.${system}.default
+            self.devShells.${system}.security
+          ];
           packages = [
-            pkgs.sops
             pkgs.age
-            pkgs.sbctl
-            pkgs.qemu
             pkgs.cloud-hypervisor
+            pkgs.qemu
+            pkgs.sbctl
+            pkgs.sops
             wasmtime38
           ];
         };

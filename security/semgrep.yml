@@ -1,0 +1,114 @@
+# Repository-owned Semgrep policy.
+#
+# The security gate loads only this file. Do not replace it with a remote
+# registry shortcut: reviews must be able to see exactly which rules execute.
+rules:
+  - id: memorycreep.python.dynamic-code-execution
+    message: Dynamic eval/exec/compile can execute attacker-controlled code.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+      - pattern: compile(...)
+
+  - id: memorycreep.python.unsafe-pickle-deserialization
+    message: Pickle deserialization can execute arbitrary code; use a data-only format.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+
+  - id: memorycreep.python.unsafe-deserialization
+    message: This deserializer can execute or instantiate attacker-controlled objects.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: yaml.load(...)
+      - pattern: yaml.unsafe_load(...)
+      - pattern: marshal.loads(...)
+      - pattern: shelve.open(...)
+
+  - id: memorycreep.python.os-shell-execution
+    message: Avoid direct shell execution; route commands through the policy runtime.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.check_call(..., shell=True, ...)
+      - pattern: subprocess.check_output(..., shell=True, ...)
+
+  - id: memorycreep.python.shell-bypass-outside-policy-runtime
+    message: The raw async shell API is permitted only inside the reviewed policy runtime.
+    severity: ERROR
+    languages: [python]
+    pattern: asyncio.create_subprocess_shell(...)
+    paths:
+      exclude:
+        - pentestagent/runtime/runtime.py
+
+  - id: memorycreep.python.tls-verification-disabled
+    message: TLS certificate verification must not be disabled.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: requests.get(..., verify=False, ...)
+      - pattern: requests.post(..., verify=False, ...)
+      - pattern: requests.put(..., verify=False, ...)
+      - pattern: requests.patch(..., verify=False, ...)
+      - pattern: requests.delete(..., verify=False, ...)
+      - pattern: requests.request(..., verify=False, ...)
+      - pattern: httpx.get(..., verify=False, ...)
+      - pattern: httpx.post(..., verify=False, ...)
+      - pattern: httpx.put(..., verify=False, ...)
+      - pattern: httpx.patch(..., verify=False, ...)
+      - pattern: httpx.delete(..., verify=False, ...)
+      - pattern: httpx.request(..., verify=False, ...)
+      - pattern: ssl._create_unverified_context(...)
+
+  - id: memorycreep.shell.download-piped-to-interpreter
+    message: Do not pipe network downloads directly into a command interpreter.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\b(?:curl|wget)\b[^\n|]{0,500}\|\s*(?:(?:ba)?sh|python(?:3)?)\b'
+    paths:
+      include:
+        - scripts/**
+        - Dockerfile*
+        - docker-entrypoint.sh
+        - .github/workflows/**
+
+  - id: memorycreep.shell.decoded-payload-piped-to-interpreter
+    message: Decoding a payload directly into an interpreter is an obfuscation risk.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\bbase64\s+(?:-d|--decode)\b[^\n|]{0,500}\|\s*(?:(?:ba)?sh|python(?:3)?)\b'
+    paths:
+      include:
+        - scripts/**
+        - Dockerfile*
+        - docker-entrypoint.sh
+        - .github/workflows/**
+
+  - id: memorycreep.secrets.high-confidence-token
+    message: A high-confidence credential-shaped value is present in tracked source.
+    severity: ERROR
+    languages: [generic]
+    pattern-either:
+      - pattern-regex: 'AKIA[0-9A-Z]{16}'
+      - pattern-regex: 'gh[pousr]_[A-Za-z0-9]{36,255}'
+      - pattern-regex: 'sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}'
+      - pattern-regex: '-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'
+    paths:
+      exclude:
+        - README.md
+        - CLAUDE.md
+        - docs/**
+        - tests/**
+        - .env.example
+        - security/semgrep.yml

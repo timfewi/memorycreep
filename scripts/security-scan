@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd "$root_dir"
+
+profile=${1:-all}
+case "$profile" in
+  all|static|dependencies)
+    ;;
+  -h|--help)
+    cat <<'EOF'
+Usage: bash scripts/security-scan [all|static|dependencies]
+
+  static        offline source audit and repository-owned Semgrep rules
+  dependencies  strict supply-chain audit and OSV vulnerability scan
+  all           run both profiles
+
+Environment for an offline OSV run:
+  OSV_OFFLINE=1
+  OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY=/trusted/pre-populated/database
+
+The script never enables OSV call analysis because that feature can execute
+package build scripts. Semgrep reads security/semgrep.yml only and sends no
+metrics. The script never downloads an offline OSV database automatically.
+EOF
+    exit 0
+    ;;
+  *)
+    echo "Unknown security profile: $profile" >&2
+    exit 2
+    ;;
+esac
+
+overall_status=0
+
+run_step() {
+  local label=$1
+  shift
+  printf '\n==> %s\n' "$label"
+  "$@"
+  local step_status=$?
+  if ((step_status != 0)); then
+    printf 'FAILED (%s): %s\n' "$step_status" "$label" >&2
+    overall_status=1
+  fi
+}
+
+missing_tool() {
+  local tool=$1
+  printf 'Missing %s. Enter the pinned shell with: nix develop .#security\n' "$tool" >&2
+  overall_status=1
+}
+
+python_bin=
+for candidate in python3 python; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    python_bin=$(command -v "$candidate")
+    break
+  fi
+done
+
+if [[ "$profile" == all || "$profile" == static ]]; then
+  run_step "source and policy invariants" bash scripts/verify-source
+
+  if [[ -n "$python_bin" ]]; then
+    run_step "source structure and binary allowlist" "$python_bin" scripts/audit-source
+  else
+    missing_tool python3
+  fi
+
+  if command -v semgrep >/dev/null 2>&1; then
+    semgrep_args=(
+      scan
+      --config
+      security/semgrep.yml
+      --error
+      --metrics=off
+      --exclude=.git
+      --exclude=.direnv
+      --exclude=security-reports
+      --exclude=.env
+      --exclude=.env.local
+      .
+    )
+    run_step \
+      "Semgrep repository-owned policy" \
+      env \
+      SEMGREP_ENABLE_VERSION_CHECK=0 \
+      SEMGREP_SEND_ANALYTICS=false \
+      SEMGREP_SEND_METRICS=off \
+      semgrep "${semgrep_args[@]}"
+  else
+    missing_tool semgrep
+  fi
+fi
+
+if [[ "$profile" == all || "$profile" == dependencies ]]; then
+  if [[ -n "$python_bin" ]]; then
+    run_step \
+      "strict dependency and immutable-input audit" \
+      "$python_bin" scripts/audit-supply-chain
+  else
+    missing_tool python3
+  fi
+
+  if [[ ! -s uv.lock ]]; then
+    printf '%s\n' \
+      "Missing uv.lock. Generate and review it before claiming transitive Python coverage:" \
+      "  nix develop .#security --command uv lock" >&2
+    overall_status=1
+  elif command -v uv >/dev/null 2>&1; then
+    if [[ ${OSV_OFFLINE:-0} == 1 ]]; then
+      run_step "uv lock consistency (offline)" uv lock --check --offline
+    else
+      run_step "uv lock consistency" uv lock --check
+    fi
+  else
+    missing_tool uv
+  fi
+
+  if command -v osv-scanner >/dev/null 2>&1; then
+    printf '%s\n' \
+      "NOTE: OSV finds published vulnerability records; it cannot prove a package is non-malicious."
+    if [[ ${OSV_OFFLINE:-0} == 1 ]]; then
+      database_dir=${OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY:-}
+      if [[ -z "$database_dir" || ! -d "$database_dir" ]]; then
+        printf '%s\n' \
+          "OSV_OFFLINE=1 requires an existing OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY." >&2
+        overall_status=1
+      else
+        run_step \
+          "OSV known-vulnerability scan (offline database)" \
+          osv-scanner --offline -r .
+      fi
+    else
+      run_step \
+        "OSV known-vulnerability scan (online database)" \
+        osv-scanner scan source -r .
+    fi
+  else
+    missing_tool osv-scanner
+  fi
+fi
+
+printf '\n'
+if ((overall_status == 0)); then
+  echo "Security gate passed."
+else
+  echo "Security gate failed. Review every finding; do not suppress it without rationale." >&2
+fi
+exit "$overall_status"

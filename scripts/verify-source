@@ -43,7 +43,15 @@ required = [
     "pentestagent/runtime/factory.py",
     "pentestagent/host_cli.py",
     "pentestagent/broker.py",
+    "scripts/audit-source",
+    "scripts/audit-supply-chain",
+    "scripts/security-scan",
+    "scripts/test-e2e",
+    "security/binary-assets.sha256",
+    "security/semgrep.yml",
+    ".github/workflows/security.yml",
     "docs/repository-guide.md",
+    "docs/security-verification.md",
     "UPSTREAM.md",
     "NOTICE",
 ]
@@ -132,6 +140,7 @@ groups = {
 for group, requirements in groups.items():
     for requirement in requirements:
         if requirement.startswith("memorycreep["):
+            fail(f"self-referential Python dependency in {group}: {requirement}")
             continue
         if "==" not in requirement:
             fail(f"unfixed Python dependency in {group}: {requirement}")
@@ -141,11 +150,14 @@ for requirement in project.get("build-system", {}).get("requires", []):
 
 shell_calls = []
 local_runtime_calls = []
+unsafe_deserialization_calls = []
 for path, text in texts.items():
     if path.suffix != ".py" or "tests" in path.parts:
         continue
     if "create_subprocess_shell" in text:
         shell_calls.append(str(path))
+    if re.search(r"\bpickle\.loads?\s*\(", text):
+        unsafe_deserialization_calls.append(str(path))
     if "LocalRuntime(" in text and path not in {
         Path("pentestagent/runtime/factory.py"),
         Path("pentestagent/runtime/runtime.py"),
@@ -155,6 +167,11 @@ if shell_calls != ["pentestagent/runtime/runtime.py"]:
     fail(f"unexpected free-shell implementation sites: {shell_calls}")
 if local_runtime_calls:
     fail(f"runtime construction bypasses RuntimeFactory: {local_runtime_calls}")
+if unsafe_deserialization_calls:
+    fail(
+        "unsafe pickle deserialization is present in production code: "
+        f"{unsafe_deserialization_calls}"
+    )
 
 guest_launcher = texts.get(Path("pentestagent/guest_launcher.py"), "")
 if '"OPENAI_API_KEY"' in guest_launcher or '"PENTESTAGENT_BROKER_TOKEN"' in guest_launcher:

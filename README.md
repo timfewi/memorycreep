@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/memorycreep-logo.png" alt="MemoryCreep logo" width="240">
+
 # MemoryCreep
 
 ### Hardened AI-assisted security testing on NixOS
@@ -12,7 +14,12 @@
 
 </div>
 
-MemoryCreep is an independent project derived from PentestAgent. It is not
+MemoryCreep is a fork of
+[PentestAgent](https://github.com/GH05TCREW/pentestagent) by
+[GH05TCREW](https://github.com/GH05TCREW); the upstream license attributes the
+original portions to Masic. MemoryCreep is a hardened NixOS host for
+policy-bound, AI-assisted security testing and has evolved into an independent
+project. It is not
 affiliated with or endorsed by the original maintainers. See
 [the repository guide](docs/repository-guide.md) and
 [the upstream policy](UPSTREAM.md).
@@ -47,6 +54,8 @@ sudo pta stop
 ```
 
 See [the workstation deployment and recovery guide](docs/nixos-workstation.md).
+For offline source checks, Semgrep, OSV, and the staged E2E commands, use the
+[security verification guide](docs/security-verification.md).
 The hardware-specific interface and kernel values live separately in
 `nix/hosts/hardware-example.nix`; secrets, Secure Boot keys, project volumes,
 VM overlays, audit logs, FIDO2 enrollment data, and Windows images are never
@@ -64,16 +73,15 @@ not the hardened workstation and must not be used as a host security boundary.
 git clone https://github.com/timfewi/memorycreep.git
 cd memorycreep
 
-# Setup (creates venv, installs deps)
-.\scripts\setup.ps1   # Windows
-./scripts/setup.sh    # Linux/macOS
+# Preferred: pinned Nix environment
+nix develop .#all
 
-# Or manual
-python -m venv venv
-.\venv\Scripts\Activate.ps1  # Windows
-source venv/bin/activate     # Linux/macOS
-pip install -e ".[all]"
-playwright install chromium  # Required for browser tool
+# Legacy helper scripts require a reviewed uv.lock and perform a frozen sync.
+.\scripts\setup.ps1   # Windows
+./scripts/setup.sh     # Linux/macOS
+
+# Equivalent Linux/macOS command with an already trusted uv binary
+UV_PROJECT_ENVIRONMENT=venv uv sync --frozen --extra dev --extra rag
 ```
 
 ## Configure
@@ -119,7 +127,10 @@ memorycreep tui --docker         # Run tools in Docker container
 
 ## Docker (legacy compatibility only)
 
-Docker mode is retained for development compatibility. It is not used by the NixOS product and is not a security boundary equivalent to the MicroVM policy.
+Docker mode is retained for development compatibility. It is not used by the
+NixOS product and is not a security boundary equivalent to the MicroVM policy.
+The strict supply-chain gate currently rejects these legacy images because
+their APT/Pip/Playwright inputs are not yet fully immutable.
 
 ### Option 1: Pull pre-built image (fastest)
 

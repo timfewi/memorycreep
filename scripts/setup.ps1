@@ -15,43 +15,37 @@ try {
     if ($pythonVersion -match "Python (\d+)\.(\d+)") {
         $major = [int]$Matches[1]
         $minor = [int]$Matches[2]
-        if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
-            Write-Host "Error: Python 3.10 or higher is required"
+        if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 12)) {
+            Write-Host "Error: Python 3.12 or higher is required"
             exit 1
         }
         Write-Host "[OK] $pythonVersion"
     }
 } catch {
-    Write-Host "Error: Python not found. Please install Python 3.10+"
+    Write-Host "Error: Python not found. Please install Python 3.12"
     exit 1
 }
 
-# Create virtual environment
-Write-Host "Creating virtual environment..."
-if (-not (Test-Path "venv")) {
-    python -m venv venv
-    Write-Host "[OK] Virtual environment created"
-} else {
-    Write-Host "[OK] Virtual environment exists"
+# Resolve only the reviewed lockfile. This script deliberately performs no
+# package-manager or browser bootstrap downloads.
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Host "Error: uv is required; use the pinned Nix environment when possible"
+    exit 1
+}
+if (-not (Test-Path "uv.lock")) {
+    Write-Host "Error: uv.lock is missing; generate and review it before setup"
+    exit 1
 }
 
-# Activate virtual environment
-Write-Host "Activating virtual environment..."
+Write-Host "Synchronizing the reviewed Python environment..."
+$env:UV_PROJECT_ENVIRONMENT = "venv"
+uv sync --frozen --extra dev --extra rag
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
 & .\venv\Scripts\Activate.ps1
-
-# Upgrade pip
-Write-Host "Upgrading pip..."
-pip install --upgrade pip
-
-# Install dependencies
-Write-Host "Installing dependencies..."
-pip install -e ".[all]"
-Write-Host "[OK] Dependencies installed"
-
-# Install playwright browsers
-Write-Host "Installing Playwright browsers..."
-playwright install chromium
-Write-Host "[OK] Playwright browsers installed"
+Write-Host "[OK] Locked dependencies installed"
+Write-Host "[INFO] Browser support is provided by the declared NixOS guest."
 
 # Create .env file if not exists
 if (-not (Test-Path ".env")) {
@@ -93,18 +87,6 @@ PENTESTAGENT_DEBUG=false
 "@ | Set-Content -Path ".env" -Encoding UTF8
     Write-Host "[OK] .env file created"
     Write-Host "[!] Please edit .env and add your API keys"
-}
-
-# Load .env into process environment variables (so the script can use them)
-if (Test-Path -Path ".env") {
-    Get-Content .env | ForEach-Object {
-        if ($_ -match '^(?:\s*#)|(?:\s*$)') { return }
-        if ($_ -match '^(\s*([^=]+)?)=(.*)$') {
-            $name = $Matches[2].Trim()
-            $value = $Matches[3].Trim()
-            if ($name) { [Environment]::SetEnvironmentVariable($name, $value, 'Process') }
-        }
-    }
 }
 
 # Create loot directory for reports

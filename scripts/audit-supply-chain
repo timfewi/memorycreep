@@ -1,0 +1,424 @@
+#!/usr/bin/env python3
+"""Fail-closed checks for mutable or opaque repository supply-chain inputs."""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SHA256_DIGEST = re.compile(r".+@sha256:[0-9a-f]{64}$")
+ACTION_SHA = re.compile(r"[^@\s]+@[0-9a-f]{40}$", re.IGNORECASE)
+DEPENDENCY_NAME = re.compile(
+    r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^]]+\])?"
+)
+EXACT_VERSION = re.compile(r"^\s*==\s*([^,;\s]+)\s*(?:;\s*.+)?$")
+BIDI_CONTROLS = frozenset(
+    {
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",
+        "\u2066",
+        "\u2067",
+        "\u2068",
+        "\u2069",
+    }
+)
+OPAQUE_MAGICS = {
+    b"\x7fELF": "ELF executable",
+    b"MZ": "PE executable",
+    b"\x00asm": "WebAssembly binary",
+}
+MAX_REVIEWABLE_BYTES = 20 * 1024 * 1024
+
+findings: list[str] = []
+
+
+def relative(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def fail(message: str) -> None:
+    findings.append(message)
+
+
+def repository_files() -> list[Path]:
+    """Return tracked and non-ignored untracked files without reading secret paths."""
+
+    if shutil.which("git") is None:
+        fail("git is unavailable; the scanner cannot establish the repository file set")
+        return []
+
+    result = subprocess.run(
+        [
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        fail("git ls-files failed; the scanner cannot establish the repository file set")
+        return []
+
+    paths: list[Path] = []
+    for raw_name in result.stdout.split(b"\0"):
+        if not raw_name:
+            continue
+        try:
+            name = raw_name.decode("utf-8")
+        except UnicodeDecodeError:
+            fail("a repository path is not valid UTF-8")
+            continue
+        path = ROOT / name
+        if path.is_symlink():
+            try:
+                path.resolve(strict=False).relative_to(ROOT.resolve())
+            except ValueError:
+                fail(f"{name}: symlink escapes the repository")
+            continue
+        if path.is_file():
+            paths.append(path)
+    return sorted(paths)
+
+
+def audit_opaque_files(paths: list[Path]) -> None:
+    for path in paths:
+        name = relative(path)
+        size = path.stat().st_size
+        if size > MAX_REVIEWABLE_BYTES:
+            fail(f"{name}: file exceeds the 20 MiB manual-review threshold")
+            continue
+
+        data = path.read_bytes()
+        for magic, description in OPAQUE_MAGICS.items():
+            if data.startswith(magic):
+                fail(f"{name}: opaque {description} must be removed or hash-allowlisted")
+                break
+
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if BIDI_CONTROLS.intersection(text):
+            fail(f"{name}: contains bidirectional Unicode controls")
+
+
+def audit_python_dependencies() -> None:
+    path = ROOT / "pyproject.toml"
+    if not path.is_file():
+        fail("pyproject.toml is missing")
+        return
+
+    with path.open("rb") as handle:
+        document = tomllib.load(handle)
+
+    project = document.get("project", {})
+    project_name = canonicalize(str(project.get("name", "")))
+    base_pins: dict[str, str] = {}
+
+    for dependency in project.get("dependencies", []):
+        parsed = exact_dependency(str(dependency), "project.dependencies", project_name)
+        if parsed is not None:
+            name, version = parsed
+            prior = base_pins.get(name)
+            if prior is not None and prior != version:
+                fail(f"project.dependencies: conflicting pins for {name}: {prior} and {version}")
+            base_pins[name] = version
+
+    optional = project.get("optional-dependencies", {})
+    for group, dependencies in sorted(optional.items()):
+        group_pins: dict[str, str] = {}
+        context = f"project.optional-dependencies.{group}"
+        for dependency in dependencies:
+            parsed = exact_dependency(str(dependency), context, project_name)
+            if parsed is None:
+                continue
+            name, version = parsed
+            prior = group_pins.get(name)
+            if prior is not None and prior != version:
+                fail(f"{context}: conflicting pins for {name}: {prior} and {version}")
+            group_pins[name] = version
+            base_version = base_pins.get(name)
+            if base_version is not None and base_version != version:
+                fail(
+                    f"{context}: {name}=={version} conflicts with the base pin "
+                    f"{name}=={base_version}"
+                )
+
+    for requirement in document.get("build-system", {}).get("requires", []):
+        exact_dependency(str(requirement), "build-system.requires", project_name)
+
+    if not (ROOT / "uv.lock").is_file():
+        fail("uv.lock is missing; transitive Python dependencies are not locked")
+
+
+def canonicalize(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def exact_dependency(
+    dependency: str, context: str, project_name: str
+) -> tuple[str, str] | None:
+    match = DEPENDENCY_NAME.match(dependency)
+    if match is None:
+        fail(f"{context}: cannot parse dependency declaration {dependency!r}")
+        return None
+
+    name = canonicalize(match.group(1))
+    if name == project_name:
+        fail(f"{context}: self-referential dependency {dependency!r} is forbidden")
+        return None
+
+    version_match = EXACT_VERSION.fullmatch(dependency[match.end() :])
+    if version_match is None:
+        fail(f"{context}: dependency {name} is not pinned with one exact version")
+        return None
+    return name, version_match.group(1)
+
+
+def audit_uv_lock() -> None:
+    path = ROOT / "uv.lock"
+    if not path.is_file():
+        return
+
+    try:
+        with path.open("rb") as handle:
+            document = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError):
+        fail("uv.lock is not valid TOML")
+        return
+
+    packages = document.get("package")
+    if not isinstance(packages, list) or not packages:
+        fail("uv.lock does not contain a resolved package graph")
+        return
+
+    project_document = tomllib.loads(
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    project_name = canonicalize(str(project_document["project"]["name"]))
+    allowed_registries = {"https://pypi.org/simple"}
+
+    for package in packages:
+        if not isinstance(package, dict):
+            fail("uv.lock contains a non-object package entry")
+            continue
+        name = canonicalize(str(package.get("name", "")))
+        source = package.get("source")
+        if not name or not isinstance(source, dict):
+            fail("uv.lock package entry is missing a name or source")
+            continue
+
+        registry = source.get("registry")
+        if registry is not None:
+            if registry not in allowed_registries:
+                fail(f"uv.lock: package {name} uses unapproved registry {registry!r}")
+            version = package.get("version")
+            if not isinstance(version, str) or not version:
+                fail(f"uv.lock: registry package {name} has no exact version")
+
+            artifacts: list[dict] = []
+            sdist = package.get("sdist")
+            if isinstance(sdist, dict):
+                artifacts.append(sdist)
+            wheels = package.get("wheels", [])
+            if isinstance(wheels, list):
+                artifacts.extend(item for item in wheels if isinstance(item, dict))
+            else:
+                fail(f"uv.lock: package {name} has an invalid wheel list")
+
+            if not artifacts:
+                fail(f"uv.lock: registry package {name} has no hashed artifacts")
+            for artifact in artifacts:
+                digest = artifact.get("hash")
+                if not isinstance(digest, str) or not re.fullmatch(
+                    r"sha256:[0-9a-f]{64}", digest
+                ):
+                    fail(f"uv.lock: package {name} has an unhashed artifact")
+            continue
+
+        if set(source) == {"editable"} and name == project_name:
+            if source.get("editable") != ".":
+                fail("uv.lock: the project editable source must be repository-local")
+            continue
+
+        fail(f"uv.lock: package {name} uses an unapproved non-registry source")
+
+
+def audit_flake_lock() -> None:
+    path = ROOT / "flake.lock"
+    if not path.is_file():
+        fail("flake.lock is missing")
+        return
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        fail("flake.lock is not valid UTF-8 JSON")
+        return
+    nodes = document.get("nodes")
+    if not isinstance(nodes, dict) or "root" not in document:
+        fail("flake.lock does not contain a normal locked-input graph")
+        return
+
+    for name, node in nodes.items():
+        if not isinstance(node, dict):
+            fail(f"flake.lock node {name!r} is not an object")
+            continue
+        locked = node.get("locked")
+        if locked is None:
+            continue
+        if not isinstance(locked, dict):
+            fail(f"flake.lock node {name!r} has invalid locked metadata")
+            continue
+        nar_hash = locked.get("narHash")
+        if not isinstance(nar_hash, str) or not nar_hash.startswith("sha256-"):
+            fail(f"flake.lock node {name!r} is missing its NAR hash")
+        if locked.get("type") in {"git", "github"}:
+            revision = locked.get("rev")
+            if not isinstance(revision, str) or not re.fullmatch(
+                r"[0-9a-f]{40}", revision
+            ):
+                fail(f"flake.lock node {name!r} is not commit-pinned")
+
+
+def audit_workflows(paths: list[Path]) -> None:
+    workflow_root = ROOT / ".github" / "workflows"
+    for path in paths:
+        try:
+            path.relative_to(workflow_root)
+        except ValueError:
+            continue
+        if path.suffix not in {".yml", ".yaml"}:
+            continue
+
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            match = re.match(r"^\s*(?:-\s*)?uses:\s*([^#\s]+)", line)
+            if match is None:
+                continue
+            reference = match.group(1).strip("'\"")
+            if reference.startswith("./"):
+                continue
+            if reference.startswith("docker://"):
+                image = reference.removeprefix("docker://")
+                if not SHA256_DIGEST.fullmatch(image):
+                    fail(
+                        f"{relative(path)}:{line_number}: container action is not "
+                        "pinned by sha256 digest"
+                    )
+                continue
+            if not ACTION_SHA.fullmatch(reference):
+                fail(
+                    f"{relative(path)}:{line_number}: action {reference!r} is not "
+                    "pinned to a full 40-character commit"
+                )
+
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if re.search(r"\b(?:python\s+-m\s+)?pip\s+install\b", line):
+                if "--require-hashes" not in line and "--no-index" not in line:
+                    fail(
+                        f"{relative(path)}:{line_number}: workflow installs "
+                        "mutable Pip content without hashes"
+                    )
+
+
+def audit_legacy_installers() -> None:
+    for name in ("scripts/setup.sh", "scripts/setup.ps1"):
+        path = ROOT / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8-sig")
+        if re.search(r"\b(?:python\s+-m\s+)?pip\s+install\b", text, re.IGNORECASE):
+            if "--require-hashes" not in text and "--no-index" not in text:
+                fail(
+                    f"{name}: installer resolves mutable Pip content without hashes"
+                )
+        if re.search(r"\bplaywright\s+install\b", text, re.IGNORECASE):
+            fail(f"{name}: installer downloads an unpinned Playwright browser")
+        if re.search(
+            r"\b(?:apt-get|dnf|pacman)\s+(?:install|-S)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            fail(f"{name}: installer resolves mutable operating-system packages")
+
+
+def audit_dockerfiles(paths: list[Path]) -> None:
+    for path in paths:
+        if not (path.name == "Dockerfile" or path.name.startswith("Dockerfile.")):
+            continue
+        text = path.read_text(encoding="utf-8")
+        logical_text = re.sub(r"\\\s*\r?\n", " ", text)
+
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            match = re.match(
+                r"^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)", line, re.IGNORECASE
+            )
+            if match is None:
+                continue
+            image = match.group(1)
+            if image.lower() != "scratch" and not SHA256_DIGEST.fullmatch(image):
+                fail(
+                    f"{relative(path)}:{line_number}: base image is not pinned by "
+                    "sha256 digest"
+                )
+
+        if re.search(r"\b(?:[A-Za-z0-9_./-]*pip(?:3)?)\s+install\b", logical_text):
+            if "--require-hashes" not in logical_text and "--no-index" not in logical_text:
+                fail(
+                    f"{relative(path)}: pip resolves downloads without "
+                    "--require-hashes or --no-index"
+                )
+        if re.search(r"\bapt-get\s+install\b", logical_text):
+            fail(
+                f"{relative(path)}: apt packages are resolved from a mutable repository; "
+                "use a snapshot and exact package versions"
+            )
+        if re.search(r"\bplaywright\s+install(?:-deps)?\b", logical_text):
+            fail(
+                f"{relative(path)}: Playwright performs a build-time download outside "
+                "the locked Nix closure"
+            )
+
+
+def main() -> int:
+    paths = repository_files()
+    audit_opaque_files(paths)
+    audit_python_dependencies()
+    audit_uv_lock()
+    audit_flake_lock()
+    audit_workflows(paths)
+    audit_legacy_installers()
+    audit_dockerfiles(paths)
+
+    if findings:
+        print(f"Supply-chain audit failed with {len(findings)} finding(s):", file=sys.stderr)
+        for finding in sorted(set(findings)):
+            print(f"  - {finding}", file=sys.stderr)
+        return 1
+
+    print("Supply-chain audit passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

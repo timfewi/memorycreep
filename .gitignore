@@ -111,3 +111,6 @@ nix/config/windows-manifest.json
 /malware-scratch/
 /windows-images/
 /session-audit/
+
+# Local security scanner output
+/security-reports/

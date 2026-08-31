@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""Fail-closed structural audit for the checked-out source tree.
+
+This deliberately uses only the Python standard library. It detects repository
+features that are easy to hide from language linters: unreviewed binary blobs,
+Trojan Source controls, escaping symlinks, unexpected executable files, mutable
+GitHub Action refs, and mutable product Docker base images.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+import stat
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+IGNORED_ANYWHERE = {
+    ".git",
+    ".direnv",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+}
+IGNORED_TOP_LEVEL = {
+    ".venv",
+    "build",
+    "conversations",
+    "deployment-secrets",
+    "dist",
+    "fido2-enrollment",
+    "loot",
+    "malware-scratch",
+    "project-volumes",
+    "security-reports",
+    "session-audit",
+    "temp",
+    "tmp",
+    "venv",
+    "vm-overlays",
+    "windows-images",
+    "workspaces",
+}
+ALLOWED_EXECUTABLES = {
+    "scripts/audit-source",
+    "scripts/audit-supply-chain",
+    "scripts/install-host",
+    "scripts/run.sh",
+    "scripts/security-scan",
+    "scripts/setup.sh",
+    "scripts/test-e2e",
+    "scripts/verify-source",
+}
+BIDI_CONTROLS = {
+    "\u202a",
+    "\u202b",
+    "\u202c",
+    "\u202d",
+    "\u202e",
+    "\u2066",
+    "\u2067",
+    "\u2068",
+    "\u2069",
+}
+ACTION_SHA = re.compile(r"[0-9a-f]{40}")
+DOCKER_DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
+MAX_REVIEWABLE_BYTES = 20 * 1024 * 1024
+
+failures: list[str] = []
+
+
+def fail(message: str) -> None:
+    failures.append(message)
+
+
+def ignored(path: Path) -> bool:
+    relative = path.relative_to(ROOT)
+    if relative.name == ".env" or relative.name.startswith(".env."):
+        return True
+    if any(part in IGNORED_ANYWHERE for part in relative.parts):
+        return True
+    first = relative.parts[0] if relative.parts else ""
+    return (
+        first in IGNORED_TOP_LEVEL
+        or first == "result"
+        or first.startswith("result-")
+    )
+
+
+def load_binary_allowlist() -> dict[str, str]:
+    manifest = ROOT / "security" / "binary-assets.sha256"
+    if not manifest.is_file():
+        fail("binary asset allowlist is missing: security/binary-assets.sha256")
+        return {}
+
+    entries: dict[str, str] = {}
+    for number, raw_line in enumerate(
+        manifest.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2 or not re.fullmatch(r"[0-9a-f]{64}", parts[0]):
+            fail(f"invalid binary allowlist entry on line {number}")
+            continue
+        path = parts[1].strip()
+        manifest_path = Path(path)
+        if (
+            manifest_path.is_absolute()
+            or ".." in manifest_path.parts
+            or "\\" in path
+        ):
+            fail(f"invalid binary allowlist path: {path}")
+            continue
+        if path in entries:
+            fail(f"duplicate binary allowlist path: {path}")
+        entries[path] = parts[0]
+    return entries
+
+
+def audit_tree() -> None:
+    expected_binaries = load_binary_allowlist()
+    seen_binaries: set[str] = set()
+    root_real = ROOT.resolve()
+
+    for path in sorted(ROOT.rglob("*")):
+        if ignored(path):
+            continue
+
+        relative = path.relative_to(ROOT).as_posix()
+        path_controls = sorted(
+            {f"U+{ord(char):04X}" for char in relative if char in BIDI_CONTROLS}
+        )
+        if path_controls:
+            fail(
+                f"Trojan Source control(s) {', '.join(path_controls)} in path "
+                f"{relative!r}"
+            )
+        if path.is_symlink():
+            resolved = path.resolve(strict=False)
+            try:
+                resolved.relative_to(root_real)
+            except ValueError:
+                fail(f"symlink escapes repository: {relative} -> {os.readlink(path)}")
+            continue
+        if not path.is_file():
+            continue
+
+        mode = path.stat().st_mode
+        if mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+            if relative not in ALLOWED_EXECUTABLES:
+                fail(f"unexpected executable file: {relative}")
+
+        if path.stat().st_size > MAX_REVIEWABLE_BYTES:
+            fail(f"file exceeds the 20 MiB review limit: {relative}")
+            continue
+
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8")
+            if "\x00" in text:
+                raise UnicodeDecodeError("utf-8", raw, 0, 1, "NUL byte")
+        except UnicodeDecodeError:
+            seen_binaries.add(relative)
+            expected = expected_binaries.get(relative)
+            actual = hashlib.sha256(raw).hexdigest()
+            if expected is None:
+                fail(f"unreviewed binary file: {relative} (sha256:{actual})")
+            elif actual != expected:
+                fail(
+                    f"binary digest changed: {relative} "
+                    f"(expected {expected}, got {actual})"
+                )
+            continue
+
+        controls = sorted({f"U+{ord(char):04X}" for char in text if char in BIDI_CONTROLS})
+        if controls:
+            fail(f"Trojan Source control(s) {', '.join(controls)} in {relative}")
+
+    for relative in sorted(set(expected_binaries) - seen_binaries):
+        fail(f"binary allowlist entry is missing or no longer binary: {relative}")
+
+
+def audit_workflow_actions() -> None:
+    workflow_dir = ROOT / ".github" / "workflows"
+    if not workflow_dir.is_dir():
+        return
+
+    for path in sorted((*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml"))):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            match = re.match(r"\s*(?:-\s*)?uses:\s*(\S+)", line)
+            if not match:
+                continue
+            value = match.group(1).split("#", 1)[0].strip()
+            if value.startswith("./"):
+                continue
+            if value.startswith("docker://"):
+                image = value.removeprefix("docker://")
+                if not DOCKER_DIGEST.search(image):
+                    fail(
+                        f"mutable Docker action in {path.relative_to(ROOT)}:{number}: "
+                        f"{value}"
+                    )
+                continue
+            if "@" not in value:
+                fail(f"action ref is missing in {path.relative_to(ROOT)}:{number}: {value}")
+                continue
+            action, revision = value.rsplit("@", 1)
+            if not ACTION_SHA.fullmatch(revision):
+                fail(
+                    f"GitHub Action is not commit-pinned in "
+                    f"{path.relative_to(ROOT)}:{number}: {action}@{revision}"
+                )
+
+
+def audit_product_docker_bases() -> None:
+    # These files are legacy compatibility artifacts, but their base image must
+    # still be immutable. Example-only Dockerfiles are reviewed separately and
+    # are not release artifacts.
+    for name in ("Dockerfile", "Dockerfile.kali"):
+        path = ROOT / name
+        if not path.is_file():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if not stripped.upper().startswith("FROM "):
+                continue
+            tokens = stripped.split()
+            image = next(
+                (token for token in tokens[1:] if not token.startswith("--")),
+                "",
+            )
+            if image.lower() == "scratch":
+                continue
+            if not DOCKER_DIGEST.search(image):
+                fail(f"mutable Docker base in {name}:{number}: {image}")
+
+
+def main() -> int:
+    audit_tree()
+    audit_workflow_actions()
+    audit_product_docker_bases()
+
+    if failures:
+        for message in failures:
+            print(f"ERROR: {message}", file=sys.stderr)
+        return 1
+
+    if not (ROOT / "uv.lock").is_file():
+        print(
+            "NOTICE: uv.lock is absent; scripts/security-scan dependencies "
+            "will fail until a reviewed lockfile is committed.",
+            file=sys.stderr,
+        )
+    print("source tree audit passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

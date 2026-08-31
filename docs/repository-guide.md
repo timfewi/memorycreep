@@ -42,6 +42,18 @@ bash scripts/verify-source
 git diff --check
 ```
 
+The canonical offline E2E gate adds the binary allowlist, local Semgrep policy,
+formatting, unit/security tests, and Nix evaluation:
+
+```bash
+nix develop .#all --command bash scripts/test-e2e quick
+```
+
+Run `bash scripts/test-e2e security` for strict provenance plus OSV, and
+`bash scripts/test-e2e full` only when the large VM/ISO builds are intended.
+See [the security verification guide](security-verification.md) for lockfile,
+offline-OSV, CI, and residual-risk details.
+
 The source gate compiles Python sources and checks pinned inputs, runtime
 construction, prohibited container privileges, capability boundaries, broker
 persistence, malware-lab isolation, and WASM snapshot enforcement.

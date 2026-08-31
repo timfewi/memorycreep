@@ -12,7 +12,7 @@ echo ""
 # Check Python version
 echo "Checking Python version..."
 python_version=$(python3 --version 2>&1 | cut -d' ' -f2 | cut -d'.' -f1,2)
-required_version="3.10"
+required_version="3.12"
 
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
     echo "Error: Python $required_version or higher is required (found $python_version)"
@@ -20,47 +20,24 @@ if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1
 fi
 echo "[OK] Python $python_version"
 
-# Create virtual environment
-echo "Creating virtual environment..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "[OK] Virtual environment created"
-else
-    echo "[OK] Virtual environment exists"
+# Resolve only the reviewed lockfile. This script deliberately performs no
+# package-manager, browser, or operating-system bootstrap downloads.
+if ! command -v uv >/dev/null 2>&1; then
+    echo "Error: uv is required; use the pinned environment: nix develop .#all"
+    exit 1
+fi
+if [ ! -f "uv.lock" ]; then
+    echo "Error: uv.lock is missing; generate and review it before setup"
+    exit 1
 fi
 
-# Activate virtual environment
-echo "Activating virtual environment..."
+echo "Synchronizing the reviewed Python environment..."
+export UV_PROJECT_ENVIRONMENT=venv
+uv sync --frozen --extra dev --extra rag
+# shellcheck disable=SC1091
 source venv/bin/activate
-
-# Upgrade pip
-echo "Upgrading pip..."
-pip install --upgrade pip
-
-# Install dependencies
-echo "Installing dependencies..."
-pip install -e ".[all]"
-echo "[OK] Dependencies installed"
-
-# Install playwright browsers
-echo "Installing Playwright browsers..."
-playwright install chromium
-echo "[OK] Playwright browsers installed"
-
-# Install clipboard utilities (required for copy/paste in the TUI on Linux)
-if command -v apt-get &>/dev/null; then
-    echo "Installing clipboard utilities (xclip, xsel)..."
-    sudo apt-get install -y xclip xsel 2>/dev/null || echo "[WARN] Could not install xclip/xsel via apt-get (non-fatal)"
-elif command -v dnf &>/dev/null; then
-    echo "Installing clipboard utilities (xclip, xsel)..."
-    sudo dnf install -y xclip xsel 2>/dev/null || echo "[WARN] Could not install xclip/xsel via dnf (non-fatal)"
-elif command -v pacman &>/dev/null; then
-    echo "Installing clipboard utilities (xclip, xsel)..."
-    sudo pacman -S --noconfirm xclip xsel 2>/dev/null || echo "[WARN] Could not install xclip/xsel via pacman (non-fatal)"
-else
-    echo "[WARN] Could not detect package manager — install xclip or xsel manually for clipboard support in the TUI"
-fi
-echo "[OK] Clipboard utilities check done"
+echo "[OK] Locked dependencies installed"
+echo "[INFO] Browser and clipboard support come from the declared NixOS guest."
 
 # Create .env file if not exists
 if [ ! -f ".env" ]; then
@@ -102,15 +79,6 @@ PENTESTAGENT_DEBUG=false
 EOF
     echo "[OK] .env file created"
     echo "[!] Please edit .env and add your API keys"
-fi
-
-# Load .env into environment if present
-if [ -f ".env" ]; then
-    # Export variables defined in .env for the duration of this script
-    set -a
-    # shellcheck disable=SC1091
-    . .env
-    set +a
 fi
 
 # Create loot directory for reports
