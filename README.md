@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/memorycreep-logo.png" alt="MemoryCreep logo" width="240">
+<img src="assets/memorycreep-banner.png" alt="MemoryCreep logo" width="480">
 
 # MemoryCreep
 
