@@ -6,6 +6,7 @@ in
 {
   microvm = {
     hypervisor = "cloud-hypervisor";
+    vsock.cid = 102;
     vcpu = 4;
     mem = 8192;
     interfaces = [
@@ -86,6 +87,8 @@ in
     avahi.enable = false;
   };
   users = {
+    # These service-only guests intentionally expose no interactive login.
+    allowNoPasswordLogin = true;
     mutableUsers = false;
     users = {
       root.hashedPassword = "!";

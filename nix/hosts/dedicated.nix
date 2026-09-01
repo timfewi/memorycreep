@@ -39,8 +39,8 @@
 
   assertions = [
     {
-      assertion = config.pentestagent.hardware.lanInterface
-        != config.pentestagent.hardware.vpnInterface;
+      assertion =
+        config.pentestagent.hardware.lanInterface != config.pentestagent.hardware.vpnInterface;
       message = "LAN and VPN profiles must use distinct declared interfaces";
     }
   ];

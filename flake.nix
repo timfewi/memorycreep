@@ -85,8 +85,7 @@
         wasmtime = wasmtime38;
         pentest-vm = pentestSystem.config.microvm.declaredRunner;
         malware-controller-vm = controllerSystem.config.microvm.declaredRunner;
-        linux-detonation-vm =
-          linuxDetonationSystem.config.microvm.declaredRunner;
+        linux-detonation-vm = linuxDetonationSystem.config.microvm.declaredRunner;
         installer-iso = installerSystem.config.system.build.isoImage;
       };
 
@@ -105,8 +104,7 @@
         host = hostSystem.config.system.build.toplevel;
         pentest-vm = pentestSystem.config.microvm.declaredRunner;
         malware-controller-vm = controllerSystem.config.microvm.declaredRunner;
-        linux-detonation-vm =
-          linuxDetonationSystem.config.microvm.declaredRunner;
+        linux-detonation-vm = linuxDetonationSystem.config.microvm.declaredRunner;
 
         source-policy = pkgs.runCommand "memorycreep-source-policy" {
           nativeBuildInputs = [
@@ -125,7 +123,7 @@
           nativeBuildInputs = [
             pkgs.bash
             pkgs.python312
-            pkgs.semgrep
+            pkgs.python312Packages.semgrep
           ];
         } ''
           cp -R ${cleanSource} source
@@ -150,7 +148,7 @@
 
         formatting = pkgs.runCommand "memorycreep-formatting" {
           nativeBuildInputs = [
-            pkgs.black
+            pkgs.python312Packages.black
             pkgs.findutils
             pkgs.nixfmt-rfc-style
             pkgs.ruff
@@ -169,7 +167,7 @@
           inputsFrom = [ pentestagent ];
           packages = [
             pkgs.bash
-            pkgs.black
+            pkgs.python312Packages.black
             pkgs.findutils
             pkgs.git
             pkgs.nixfmt-rfc-style
@@ -186,7 +184,7 @@
           inputsFrom = [ self.devShells.${system}.default ];
           packages = [
             pkgs.osv-scanner
-            pkgs.semgrep
+            pkgs.python312Packages.semgrep
           ];
         };
         all = pkgs.mkShell {

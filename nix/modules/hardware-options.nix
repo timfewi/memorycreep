@@ -24,10 +24,9 @@ in
 
   config = {
     networking.hostName = cfg.hostName;
-    environment.etc."pentestagent/network.json".source =
-      networkConfig.generate "pentestagent-network.json" {
-        lan_interface = cfg.lanInterface;
-        vpn_interface = cfg.vpnInterface;
-      };
+    environment.etc."pentestagent/network.json".source = networkConfig.generate "pentestagent-network.json" {
+      lan_interface = cfg.lanInterface;
+      vpn_interface = cfg.vpnInterface;
+    };
   };
 }
