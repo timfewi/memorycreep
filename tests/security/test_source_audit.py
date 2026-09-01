@@ -46,7 +46,7 @@ def test_clean_minimal_tree_passes(tmp_path):
 def test_trojan_source_control_is_rejected(tmp_path):
     audit = _audit_fixture(tmp_path)
     (tmp_path / "probe.py").write_text(
-        '# harmless text followed by a bidi control: \u202e\n',
+        "# harmless text followed by a bidi control: \u202e\n",
         encoding="utf-8",
     )
 

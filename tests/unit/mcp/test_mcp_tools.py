@@ -7,10 +7,10 @@ import pytest
 from pentestagent.mcp.tools import create_mcp_tool, format_mcp_result
 from pentestagent.tools.registry import Tool
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_server(name: str = "test_server") -> MagicMock:
     server = MagicMock()
@@ -20,7 +20,9 @@ def _make_server(name: str = "test_server") -> MagicMock:
 
 def _make_manager(result=None) -> MagicMock:
     manager = MagicMock()
-    manager.call_tool = AsyncMock(return_value=result or [{"type": "text", "text": "ok"}])
+    manager.call_tool = AsyncMock(
+        return_value=result or [{"type": "text", "text": "ok"}]
+    )
     return manager
 
 
@@ -40,13 +42,16 @@ def _basic_tool_def(name: str = "my_tool") -> dict:
 # create_mcp_tool — structure
 # ---------------------------------------------------------------------------
 
+
 class TestCreateMCPToolStructure:
     def test_returns_tool_instance(self):
         tool = create_mcp_tool(_basic_tool_def(), _make_server(), _make_manager())
         assert isinstance(tool, Tool)
 
     def test_tool_name_prefixed_with_server(self):
-        tool = create_mcp_tool(_basic_tool_def("ping"), _make_server("srv"), _make_manager())
+        tool = create_mcp_tool(
+            _basic_tool_def("ping"), _make_server("srv"), _make_manager()
+        )
         assert tool.name == "mcp_srv_ping"
 
     def test_tool_description_from_def(self):
@@ -62,7 +67,9 @@ class TestCreateMCPToolStructure:
         assert "param" in tool.schema.required
 
     def test_tool_category_includes_server_name(self):
-        tool = create_mcp_tool(_basic_tool_def(), _make_server("myserver"), _make_manager())
+        tool = create_mcp_tool(
+            _basic_tool_def(), _make_server("myserver"), _make_manager()
+        )
         assert "myserver" in tool.category
 
     def test_tool_metadata_has_mcp_server(self):
@@ -88,6 +95,7 @@ class TestCreateMCPToolStructure:
 # ---------------------------------------------------------------------------
 # create_mcp_tool — execution
 # ---------------------------------------------------------------------------
+
 
 class TestCreateMCPToolExecution:
     @pytest.mark.asyncio
@@ -139,13 +147,16 @@ class TestCreateMCPToolExecution:
 # format_mcp_result
 # ---------------------------------------------------------------------------
 
+
 class TestFormatMCPResult:
     def test_text_type(self):
         result = format_mcp_result([{"type": "text", "text": "hello"}])
         assert "hello" in result
 
     def test_image_type(self):
-        result = format_mcp_result([{"type": "image", "mimeType": "image/png", "data": "abc"}])
+        result = format_mcp_result(
+            [{"type": "image", "mimeType": "image/png", "data": "abc"}]
+        )
         assert "Image" in result
         assert "image/png" in result
 
@@ -188,6 +199,7 @@ class TestFormatMCPResult:
 # ---------------------------------------------------------------------------
 # Security: MCP tool names from malicious servers
 # ---------------------------------------------------------------------------
+
 
 class TestMCPSchemaInjection:
     """Verify that dangerous tool names / schemas from untrusted MCP servers

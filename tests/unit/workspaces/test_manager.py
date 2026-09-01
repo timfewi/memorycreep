@@ -8,10 +8,10 @@ from pentestagent.workspaces.manager import (
     WorkspaceManager,
 )
 
-
 # ---------------------------------------------------------------------------
 # TargetManager.normalize_target
 # ---------------------------------------------------------------------------
+
 
 class TestTargetManagerNormalize:
     def test_valid_ipv4(self):
@@ -69,6 +69,7 @@ class TestTargetManagerValidate:
 # WorkspaceManager — name validation (path traversal security)
 # ---------------------------------------------------------------------------
 
+
 class TestWorkspaceNameValidation:
     def test_valid_name(self, tmp_path):
         mgr = WorkspaceManager(root=tmp_path)
@@ -107,6 +108,7 @@ class TestWorkspaceNameValidation:
 # ---------------------------------------------------------------------------
 # WorkspaceManager — CRUD
 # ---------------------------------------------------------------------------
+
 
 class TestWorkspaceManagerCreate:
     def test_create_workspace(self, tmp_path):

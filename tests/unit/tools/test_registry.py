@@ -17,10 +17,10 @@ from pentestagent.tools.registry import (
     unregister_tool,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_tool(name: str = "test_tool", category: str = "general") -> Tool:
     async def _fn(arguments: dict, runtime) -> str:
@@ -50,6 +50,7 @@ def isolated_registry():
 # ToolSchema
 # ---------------------------------------------------------------------------
 
+
 class TestToolSchema:
     def test_defaults_initialized(self):
         schema = ToolSchema()
@@ -71,6 +72,7 @@ class TestToolSchema:
 # ---------------------------------------------------------------------------
 # Tool.validate_arguments
 # ---------------------------------------------------------------------------
+
 
 class TestToolValidateArguments:
     def test_valid_arguments_pass(self):
@@ -144,6 +146,7 @@ class TestToolValidateArguments:
 # Tool.to_llm_format
 # ---------------------------------------------------------------------------
 
+
 class TestToolToLlmFormat:
     def test_format_has_type_function(self):
         tool = _make_tool()
@@ -172,6 +175,7 @@ class TestToolToLlmFormat:
 # Tool.execute — disabled state
 # ---------------------------------------------------------------------------
 
+
 class TestToolDisabledExecution:
     @pytest.mark.asyncio
     async def test_disabled_tool_returns_disabled_message(self):
@@ -190,6 +194,7 @@ class TestToolDisabledExecution:
 # ---------------------------------------------------------------------------
 # Registry operations
 # ---------------------------------------------------------------------------
+
 
 class TestRegisterAndGet:
     def test_register_tool_instance_and_get(self):

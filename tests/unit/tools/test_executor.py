@@ -1,18 +1,20 @@
 """Tests for pentestagent.tools.executor (ToolExecutor, ExecutionResult)."""
 
 import asyncio
+
 import pytest
 
 from pentestagent.tools.executor import ExecutionResult, ToolExecutor
 from pentestagent.tools.registry import Tool, ToolSchema
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_tool(name: str = "t", success: bool = True, delay: float = 0.0,
-               required: list = None) -> Tool:
+
+def _make_tool(
+    name: str = "t", success: bool = True, delay: float = 0.0, required: list = None
+) -> Tool:
     async def fn(arguments: dict, runtime) -> str:
         if delay:
             await asyncio.sleep(delay)
@@ -35,6 +37,7 @@ def _make_executor(timeout: int = 10, max_retries: int = 0) -> ToolExecutor:
 # ExecutionResult
 # ---------------------------------------------------------------------------
 
+
 class TestExecutionResult:
     def test_duration_property(self):
         r = ExecutionResult(tool_name="t", arguments={}, duration_ms=1500.0)
@@ -48,6 +51,7 @@ class TestExecutionResult:
 # ---------------------------------------------------------------------------
 # ToolExecutor.execute — success path
 # ---------------------------------------------------------------------------
+
 
 class TestToolExecutorSuccess:
     @pytest.mark.asyncio
@@ -94,6 +98,7 @@ class TestToolExecutorSuccess:
 # ToolExecutor.execute — failure paths
 # ---------------------------------------------------------------------------
 
+
 class TestToolExecutorFailure:
     @pytest.mark.asyncio
     async def test_invalid_arguments_fail_immediately(self):
@@ -131,6 +136,7 @@ class TestToolExecutorFailure:
 # Retries
 # ---------------------------------------------------------------------------
 
+
 class TestToolExecutorRetries:
     @pytest.mark.asyncio
     async def test_retry_on_failure(self):
@@ -160,6 +166,7 @@ class TestToolExecutorRetries:
 # execute_batch
 # ---------------------------------------------------------------------------
 
+
 class TestToolExecutorBatch:
     @pytest.mark.asyncio
     async def test_sequential_batch(self):
@@ -188,7 +195,9 @@ class TestToolExecutorBatch:
             results_order.append(arguments["cmd"])
             return "ok"
 
-        tool = Tool(name="ord", description="", schema=ToolSchema(), execute_fn=ordered_fn)
+        tool = Tool(
+            name="ord", description="", schema=ToolSchema(), execute_fn=ordered_fn
+        )
         executor = _make_executor()
         await executor.execute_batch(
             [(tool, {"cmd": "first"}), (tool, {"cmd": "second"})]
@@ -199,6 +208,7 @@ class TestToolExecutorBatch:
 # ---------------------------------------------------------------------------
 # get_execution_stats
 # ---------------------------------------------------------------------------
+
 
 class TestExecutionStats:
     @pytest.mark.asyncio
@@ -240,6 +250,7 @@ class TestExecutionStats:
 # ---------------------------------------------------------------------------
 # History management
 # ---------------------------------------------------------------------------
+
 
 class TestHistoryManagement:
     @pytest.mark.asyncio

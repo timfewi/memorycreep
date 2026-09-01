@@ -38,9 +38,7 @@ class RecordingRuntime(Runtime):
     async def stop(self) -> None:
         self.stops += 1
 
-    async def execute_command(
-        self, command: str, timeout: int = 300
-    ) -> CommandResult:
+    async def execute_command(self, command: str, timeout: int = 300) -> CommandResult:
         self.commands.append(command)
         return CommandResult(0, "ok", "")
 
@@ -244,9 +242,7 @@ async def test_local_dotted_filename_is_not_treated_as_network_target(tmp_path):
     ],
 )
 @pytest.mark.asyncio
-async def test_high_risk_strings_cannot_claim_recon(
-    tmp_path, command, expected_risk
-):
+async def test_high_risk_strings_cannot_claim_recon(tmp_path, command, expected_risk):
     targets = ["10.20.0.5"] if "10.20.0.5" in command else ["target.example"]
     runtime, backend = _runtime(tmp_path)
 

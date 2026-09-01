@@ -2,7 +2,6 @@
 
 import json
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -90,8 +89,14 @@ class TestGetStatsSync:
 
     def test_has_required_keys(self, isolated_tracker):
         stats = tt.get_stats_sync()
-        for key in ("daily_usage", "last_reset_date", "last_input_tokens",
-                    "last_output_tokens", "last_total_tokens", "current_date"):
+        for key in (
+            "daily_usage",
+            "last_reset_date",
+            "last_input_tokens",
+            "last_output_tokens",
+            "last_total_tokens",
+            "current_date",
+        ):
             assert key in stats
 
     def test_current_date_is_today(self, isolated_tracker):

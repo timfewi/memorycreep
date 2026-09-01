@@ -1,7 +1,5 @@
 """Tests for pentestagent.llm.config."""
 
-import pytest
-
 from pentestagent.llm.config import (
     BALANCED_CONFIG,
     CREATIVE_CONFIG,
@@ -91,7 +89,11 @@ class TestPresetConfigs:
         assert CREATIVE_CONFIG.temperature >= 0.7
 
     def test_balanced_temperature_between_presets(self):
-        assert PRECISE_CONFIG.temperature <= BALANCED_CONFIG.temperature <= CREATIVE_CONFIG.temperature
+        assert (
+            PRECISE_CONFIG.temperature
+            <= BALANCED_CONFIG.temperature
+            <= CREATIVE_CONFIG.temperature
+        )
 
     def test_all_presets_valid_top_p(self):
         for cfg in (CREATIVE_CONFIG, PRECISE_CONFIG, BALANCED_CONFIG):

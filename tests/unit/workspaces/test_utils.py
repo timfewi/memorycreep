@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from pentestagent.workspaces.manager import WorkspaceManager
 import pentestagent.workspaces.utils as ws_utils
+from pentestagent.workspaces.manager import WorkspaceManager
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +21,7 @@ def reset_warn_flags():
 # ---------------------------------------------------------------------------
 # get_conversations_base — with active workspace
 # ---------------------------------------------------------------------------
+
 
 class TestGetConversationsBaseWithWorkspace:
     def test_returns_workspace_memory_conversations_path(self, tmp_path):
@@ -72,12 +73,15 @@ class TestGetConversationsBaseWithWorkspace:
         result = ws_utils.get_conversations_base(root=tmp_path)
 
         # Replicate the path seen in the JSON fixtures under workspaces/hola/memory/conversations/
-        assert result.relative_to(tmp_path) == Path("workspaces/hola/memory/conversations")
+        assert result.relative_to(tmp_path) == Path(
+            "workspaces/hola/memory/conversations"
+        )
 
 
 # ---------------------------------------------------------------------------
 # get_conversations_base — without active workspace
 # ---------------------------------------------------------------------------
+
 
 class TestGetConversationsBaseWithoutWorkspace:
     def test_returns_global_conversations_directory(self, tmp_path):
@@ -97,7 +101,9 @@ class TestGetConversationsBaseWithoutWorkspace:
             ws_utils.get_conversations_base(root=tmp_path)
             ws_utils.get_conversations_base(root=tmp_path)
 
-        warning_msgs = [r for r in caplog.records if "conversations" in r.message.lower()]
+        warning_msgs = [
+            r for r in caplog.records if "conversations" in r.message.lower()
+        ]
         assert len(warning_msgs) == 1
 
     def test_not_nested_under_workspaces(self, tmp_path):
@@ -109,6 +115,7 @@ class TestGetConversationsBaseWithoutWorkspace:
 # ---------------------------------------------------------------------------
 # get_conversations_base — switching workspace changes path
 # ---------------------------------------------------------------------------
+
 
 class TestGetConversationsBaseSwitchWorkspace:
     def test_different_workspaces_produce_different_paths(self, tmp_path):

@@ -1,8 +1,6 @@
 """Tests for pentestagent.tools.notes."""
 
-import asyncio
 import json
-from pathlib import Path
 
 import pytest
 
@@ -14,10 +12,10 @@ from pentestagent.tools.notes import (
     set_notes_file,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixture: isolated notes file per test
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def isolated_notes(tmp_path):
@@ -37,6 +35,7 @@ async def _call(action: str, **kwargs) -> str:
 # ---------------------------------------------------------------------------
 # CRUD operations
 # ---------------------------------------------------------------------------
+
 
 class TestNotesCreate:
     @pytest.mark.asyncio
@@ -70,8 +69,14 @@ class TestNotesCreate:
 
     @pytest.mark.asyncio
     async def test_create_with_valid_category(self):
-        result = await _call("create", key="k", value="v", category="vulnerability",
-                             target="192.168.1.1", cve="CVE-2021-0001")
+        result = await _call(
+            "create",
+            key="k",
+            value="v",
+            category="vulnerability",
+            target="192.168.1.1",
+            cve="CVE-2021-0001",
+        )
         assert "Error" not in result
 
     @pytest.mark.asyncio
@@ -172,16 +177,20 @@ class TestNotesList:
 # Schema validation
 # ---------------------------------------------------------------------------
 
+
 class TestNoteSchemaValidation:
     def test_credential_missing_target_fails(self):
-        err = _validate_note_schema("credential", {"username": "admin", "password": "pass"})
+        err = _validate_note_schema(
+            "credential", {"username": "admin", "password": "pass"}
+        )
         assert err is not None
         assert "target" in err
 
     def test_credential_valid(self):
-        err = _validate_note_schema("credential", {
-            "username": "admin", "password": "pass", "target": "10.0.0.1"
-        })
+        err = _validate_note_schema(
+            "credential",
+            {"username": "admin", "password": "pass", "target": "10.0.0.1"},
+        )
         assert err is None
 
     def test_vulnerability_missing_target_fails(self):
@@ -189,9 +198,9 @@ class TestNoteSchemaValidation:
         assert err is not None
 
     def test_vulnerability_valid(self):
-        err = _validate_note_schema("vulnerability", {
-            "target": "10.0.0.1", "cve": "CVE-2021-1234"
-        })
+        err = _validate_note_schema(
+            "vulnerability", {"target": "10.0.0.1", "cve": "CVE-2021-1234"}
+        )
         assert err is None
 
     def test_finding_missing_host_data_fails(self):
@@ -199,10 +208,10 @@ class TestNoteSchemaValidation:
         assert err is not None
 
     def test_finding_valid_with_services(self):
-        err = _validate_note_schema("finding", {
-            "target": "10.0.0.1",
-            "services": [{"port": 80, "product": "nginx"}]
-        })
+        err = _validate_note_schema(
+            "finding",
+            {"target": "10.0.0.1", "services": [{"port": 80, "product": "nginx"}]},
+        )
         assert err is None
 
     def test_host_specific_field_without_target_fails(self):
@@ -217,6 +226,7 @@ class TestNoteSchemaValidation:
 # ---------------------------------------------------------------------------
 # Security: JSON injection / prototype pollution attempts
 # ---------------------------------------------------------------------------
+
 
 class TestNotesSecurityContent:
     @pytest.mark.asyncio

@@ -1,6 +1,5 @@
 import asyncio
 
-
 from pentestagent.mcp.example_adapter import ExampleAdapter
 
 

@@ -6,13 +6,13 @@ to reach out-of-scope hosts through edge cases in IP/CIDR comparison logic.
 
 import pytest
 
-from pentestagent.workspaces.validation import is_target_in_scope
 from pentestagent.workspaces.manager import TargetManager, WorkspaceError
-
+from pentestagent.workspaces.validation import is_target_in_scope
 
 # ---------------------------------------------------------------------------
 # IPv4 scope bypass attempts
 # ---------------------------------------------------------------------------
+
 
 class TestIPv4ScopeBypass:
     def test_zero_cidr_does_not_match_all(self):
@@ -44,6 +44,7 @@ class TestIPv4ScopeBypass:
 # CIDR expansion bypass
 # ---------------------------------------------------------------------------
 
+
 class TestCIDRExpansionBypass:
     def test_larger_network_not_within_smaller_allowed(self):
         # Attacker requests a larger network that contains the allowed one
@@ -59,6 +60,7 @@ class TestCIDRExpansionBypass:
 # ---------------------------------------------------------------------------
 # Hostname bypass
 # ---------------------------------------------------------------------------
+
 
 class TestHostnameScopeBypass:
     def test_similar_hostname_rejected(self):
@@ -87,6 +89,7 @@ class TestHostnameScopeBypass:
 # Mixed IP/hostname scope
 # ---------------------------------------------------------------------------
 
+
 class TestMixedScopeEntries:
     def test_ip_against_hostname_scope(self):
         # IP address should not match hostname-only scope
@@ -107,14 +110,18 @@ class TestMixedScopeEntries:
 # TargetManager path traversal via normalize
 # ---------------------------------------------------------------------------
 
+
 class TestTargetManagerPathTraversal:
-    @pytest.mark.parametrize("payload", [
-        "../etc/passwd",
-        "../../root",
-        "/etc/shadow",
-        "c:\\windows\\system32",
-        "%2e%2e/etc/passwd",
-    ])
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            "../etc/passwd",
+            "../../root",
+            "/etc/shadow",
+            "c:\\windows\\system32",
+            "%2e%2e/etc/passwd",
+        ],
+    )
     def test_path_like_inputs_rejected(self, payload):
         with pytest.raises((WorkspaceError, Exception)):
             TargetManager.normalize_target(payload)

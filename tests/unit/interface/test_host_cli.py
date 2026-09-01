@@ -68,9 +68,7 @@ def test_dns_answers_are_pinned_once(monkeypatch):
     scope = _resolve_scope(["Target.Example."])
 
     assert calls == 1
-    assert scope.dns_pins == {
-        "target.example": ("192.0.2.10", "2001:db8::10")
-    }
+    assert scope.dns_pins == {"target.example": ("192.0.2.10", "2001:db8::10")}
     assert scope.firewall_ipv4 == ("192.0.2.10",)
     assert scope.firewall_ipv6 == ("2001:db8::10",)
 

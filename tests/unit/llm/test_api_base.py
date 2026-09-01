@@ -2,7 +2,6 @@
 
 import os
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
@@ -34,14 +33,20 @@ class TestIsOpenAICompatibleModel:
         assert self._make_llm("chatgpt-4o")._is_openai_compatible_model()
 
     def test_anthropic_not_openai(self):
-        assert not self._make_llm("claude-sonnet-4-20250514")._is_openai_compatible_model()
-        assert not self._make_llm("anthropic/claude-opus-4")._is_openai_compatible_model()
+        assert not self._make_llm(
+            "claude-sonnet-4-20250514"
+        )._is_openai_compatible_model()
+        assert not self._make_llm(
+            "anthropic/claude-opus-4"
+        )._is_openai_compatible_model()
 
     def test_ollama_not_openai(self):
         assert not self._make_llm("ollama/llama3")._is_openai_compatible_model()
 
     def test_gemini_not_openai(self):
-        assert not self._make_llm("gemini/gemini-2.5-flash")._is_openai_compatible_model()
+        assert not self._make_llm(
+            "gemini/gemini-2.5-flash"
+        )._is_openai_compatible_model()
 
 
 class TestApplyApiBase:

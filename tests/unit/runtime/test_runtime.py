@@ -1,6 +1,5 @@
 """Tests for pentestagent.runtime.runtime (CommandResult, detect_environment, LocalRuntime)."""
 
-import asyncio
 import pytest
 
 from pentestagent.runtime.runtime import (
@@ -11,10 +10,10 @@ from pentestagent.runtime.runtime import (
     detect_environment,
 )
 
-
 # ---------------------------------------------------------------------------
 # CommandResult
 # ---------------------------------------------------------------------------
+
 
 class TestCommandResult:
     def test_success_on_zero_exit_code(self):
@@ -50,6 +49,7 @@ class TestCommandResult:
 # ---------------------------------------------------------------------------
 # EnvironmentInfo
 # ---------------------------------------------------------------------------
+
 
 class TestEnvironmentInfo:
     def _make_env(self, tools=None):
@@ -90,6 +90,7 @@ class TestEnvironmentInfo:
 # detect_environment
 # ---------------------------------------------------------------------------
 
+
 class TestDetectEnvironment:
     def test_returns_environment_info(self):
         env = detect_environment()
@@ -120,6 +121,7 @@ class TestDetectEnvironment:
 # ---------------------------------------------------------------------------
 # LocalRuntime — basic lifecycle
 # ---------------------------------------------------------------------------
+
 
 class TestLocalRuntimeLifecycle:
     @pytest.mark.asyncio
@@ -162,6 +164,7 @@ class TestLocalRuntimeLifecycle:
 # ---------------------------------------------------------------------------
 # LocalRuntime — execute_command
 # ---------------------------------------------------------------------------
+
 
 class TestLocalRuntimeExecuteCommand:
     @pytest.mark.asyncio

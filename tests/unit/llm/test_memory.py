@@ -1,14 +1,15 @@
 """Tests for pentestagent.llm.memory (ConversationMemory)."""
 
-import pytest
 from unittest.mock import AsyncMock
 
-from pentestagent.llm.memory import ConversationMemory
+import pytest
 
+from pentestagent.llm.memory import ConversationMemory
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _msg(role: str, content: str) -> dict:
     return {"role": role, "content": content}
@@ -21,6 +22,7 @@ def _make_history(n: int, role: str = "user") -> list:
 # ---------------------------------------------------------------------------
 # Initialization
 # ---------------------------------------------------------------------------
+
 
 class TestConversationMemoryInit:
     def test_default_token_budget(self):
@@ -43,13 +45,19 @@ class TestConversationMemoryInit:
     def test_get_stats_fields(self):
         mem = ConversationMemory()
         stats = mem.get_stats()
-        for key in ("max_tokens", "token_budget", "summarize_threshold", "recent_to_keep"):
+        for key in (
+            "max_tokens",
+            "token_budget",
+            "summarize_threshold",
+            "recent_to_keep",
+        ):
             assert key in stats
 
 
 # ---------------------------------------------------------------------------
 # get_messages — basic truncation
 # ---------------------------------------------------------------------------
+
 
 class TestGetMessages:
     def test_empty_history_returns_empty(self):
@@ -93,6 +101,7 @@ class TestGetMessages:
 # Token counting
 # ---------------------------------------------------------------------------
 
+
 class TestTokenCounting:
     def test_get_total_tokens_positive(self):
         mem = ConversationMemory()
@@ -124,6 +133,7 @@ class TestTokenCounting:
 # get_messages_with_summary
 # ---------------------------------------------------------------------------
 
+
 class TestGetMessagesWithSummary:
     @pytest.mark.asyncio
     async def test_small_history_not_summarized(self):
@@ -148,10 +158,7 @@ class TestGetMessagesWithSummary:
         result = await mem.get_messages_with_summary(history, llm_call)
         llm_call.assert_called()
         # Result should include the summary message
-        assert any(
-            "summary" in msg.get("content", "").lower()
-            for msg in result
-        )
+        assert any("summary" in msg.get("content", "").lower() for msg in result)
 
     @pytest.mark.asyncio
     async def test_empty_history_returns_empty(self):
@@ -184,6 +191,7 @@ class TestGetMessagesWithSummary:
 # clear_summary_cache
 # ---------------------------------------------------------------------------
 
+
 class TestClearSummaryCache:
     def test_clear_resets_cached_summary(self):
         mem = ConversationMemory()
@@ -205,6 +213,7 @@ class TestClearSummaryCache:
 # ---------------------------------------------------------------------------
 # Security: API keys must not be injected into summary prompts
 # ---------------------------------------------------------------------------
+
 
 class TestSecuritySensitiveDataInSummary:
     @pytest.mark.asyncio
@@ -232,7 +241,10 @@ class TestSecuritySensitiveDataInSummary:
 
     def test_format_for_summary_includes_user_and_assistant(self):
         mem = ConversationMemory()
-        messages = [_msg("user", "scan 192.168.1.1"), _msg("assistant", "starting scan")]
+        messages = [
+            _msg("user", "scan 192.168.1.1"),
+            _msg("assistant", "starting scan"),
+        ]
         result = mem._format_for_summary(messages)
         assert "scan 192.168.1.1" in result
         assert "starting scan" in result

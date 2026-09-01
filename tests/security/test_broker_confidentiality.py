@@ -16,9 +16,7 @@ from pentestagent.broker import (
 )
 
 
-def _broker(
-    tmp_path: Path, limits: ProviderLimits | None = None
-) -> CloudKeyBroker:
+def _broker(tmp_path: Path, limits: ProviderLimits | None = None) -> CloudKeyBroker:
     provider = ProviderConfig(
         name="openai",
         base_url="https://api.openai.com",
@@ -136,9 +134,7 @@ def test_negative_provider_cost_cannot_disable_budget_enforcement():
 def test_chat_requests_receive_a_provider_enforced_default_limit():
     payload = {"model": "gpt-5", "messages": []}
 
-    requested = CloudKeyBroker._enforce_output_limit(
-        payload, "chat/completions", 1024
-    )
+    requested = CloudKeyBroker._enforce_output_limit(payload, "chat/completions", 1024)
 
     assert requested == 1024
     assert payload["max_completion_tokens"] == 1024

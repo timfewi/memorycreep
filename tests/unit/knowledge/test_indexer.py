@@ -3,15 +3,13 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from pentestagent.knowledge.indexer import IndexingResult, KnowledgeIndexer
 from pentestagent.knowledge.rag import Document
-
 
 # ---------------------------------------------------------------------------
 # IndexingResult
 # ---------------------------------------------------------------------------
+
 
 class TestIndexingResult:
     def test_fields_accessible(self):
@@ -26,6 +24,7 @@ class TestIndexingResult:
 # KnowledgeIndexer.index_file — text files
 # ---------------------------------------------------------------------------
 
+
 class TestIndexFile:
     def test_index_txt_file(self, tmp_path):
         f = tmp_path / "test.txt"
@@ -37,7 +36,10 @@ class TestIndexFile:
 
     def test_index_md_file(self, tmp_path):
         f = tmp_path / "test.md"
-        f.write_text("# Title\n\nSome markdown content.\n\n## Section\n\nMore content.", encoding="utf-8")
+        f.write_text(
+            "# Title\n\nSome markdown content.\n\n## Section\n\nMore content.",
+            encoding="utf-8",
+        )
         indexer = KnowledgeIndexer()
         docs = indexer.index_file(f)
         assert len(docs) >= 1
@@ -89,6 +91,7 @@ class TestIndexFile:
 # KnowledgeIndexer._chunk_text
 # ---------------------------------------------------------------------------
 
+
 class TestChunkText:
     def test_short_text_single_chunk(self):
         indexer = KnowledgeIndexer(chunk_size=1000)
@@ -111,6 +114,7 @@ class TestChunkText:
 # ---------------------------------------------------------------------------
 # KnowledgeIndexer.index_directory
 # ---------------------------------------------------------------------------
+
 
 class TestIndexDirectory:
     def test_nonexistent_directory_returns_error(self):
@@ -152,6 +156,7 @@ class TestIndexDirectory:
 # ---------------------------------------------------------------------------
 # KnowledgeIndexer.create_knowledge_structure
 # ---------------------------------------------------------------------------
+
 
 class TestCreateKnowledgeStructure:
     def test_creates_expected_directories(self, tmp_path):

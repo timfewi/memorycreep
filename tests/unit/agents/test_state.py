@@ -2,14 +2,19 @@
 
 import time
 
-import pytest
-
-from pentestagent.agents.state import AgentState, AgentStateManager, StateTransition
+from pentestagent.agents.state import AgentState, AgentStateManager
 
 
 class TestAgentStateEnum:
     def test_all_states_exist(self):
-        expected = {"IDLE", "THINKING", "EXECUTING", "WAITING_INPUT", "COMPLETE", "ERROR"}
+        expected = {
+            "IDLE",
+            "THINKING",
+            "EXECUTING",
+            "WAITING_INPUT",
+            "COMPLETE",
+            "ERROR",
+        }
         actual = {s.name for s in AgentState}
         assert expected == actual
 

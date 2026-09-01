@@ -1,17 +1,17 @@
 """Tests for pentestagent.interface.conversation_store (ConversationStore)."""
 
 import json
-from pathlib import Path
-
-import pytest
 
 from pentestagent.agents.base_agent import AgentMessage, ToolCall, ToolResult
-from pentestagent.interface.conversation_store import ConversationMeta, ConversationStore
-
+from pentestagent.interface.conversation_store import (
+    ConversationMeta,
+    ConversationStore,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _user(content: str) -> AgentMessage:
     return AgentMessage(role="user", content=content)
@@ -21,13 +21,17 @@ def _assistant(content: str) -> AgentMessage:
     return AgentMessage(role="assistant", content=content)
 
 
-def _assistant_with_tool_call(content: str, call_id: str, tool_name: str, args: dict) -> AgentMessage:
+def _assistant_with_tool_call(
+    content: str, call_id: str, tool_name: str, args: dict
+) -> AgentMessage:
     tc = ToolCall(id=call_id, name=tool_name, arguments=args)
     return AgentMessage(role="assistant", content=content, tool_calls=[tc])
 
 
 def _tool_result(call_id: str, tool_name: str, result: str) -> AgentMessage:
-    tr = ToolResult(tool_call_id=call_id, tool_name=tool_name, result=result, success=True)
+    tr = ToolResult(
+        tool_call_id=call_id, tool_name=tool_name, result=result, success=True
+    )
     return AgentMessage(role="tool_result", content="", tool_results=[tr])
 
 
@@ -60,6 +64,7 @@ _TOOL_MESSAGES = [
 # ---------------------------------------------------------------------------
 # ConversationStore.save — new conversations
 # ---------------------------------------------------------------------------
+
 
 class TestSaveNewConversation:
     def test_returns_conv_id(self, tmp_path):
@@ -131,6 +136,7 @@ class TestSaveNewConversation:
 # ConversationStore.save — update in-place (existing conv_id)
 # ---------------------------------------------------------------------------
 
+
 class TestSaveUpdateInPlace:
     def test_overwrites_file_same_id(self, tmp_path):
         store = ConversationStore(tmp_path)
@@ -176,13 +182,14 @@ class TestSaveUpdateInPlace:
 # ConversationStore.load
 # ---------------------------------------------------------------------------
 
+
 class TestLoad:
     def test_roundtrip_simple_messages(self, tmp_path):
         store = ConversationStore(tmp_path)
         conv_id = store.save(_HELLO_MESSAGES)
         loaded = store.load(conv_id)
         assert len(loaded) == len(_HELLO_MESSAGES)
-        for orig, restored in zip(_HELLO_MESSAGES, loaded):
+        for orig, restored in zip(_HELLO_MESSAGES, loaded, strict=True):
             assert restored.role == orig.role
             assert restored.content == orig.content
 
@@ -301,6 +308,7 @@ class TestLoad:
 # ConversationStore.list_conversations
 # ---------------------------------------------------------------------------
 
+
 class TestListConversations:
     def test_empty_when_no_index(self, tmp_path):
         store = ConversationStore(tmp_path)
@@ -353,6 +361,7 @@ class TestListConversations:
 # ---------------------------------------------------------------------------
 # ConversationStore._prune
 # ---------------------------------------------------------------------------
+
 
 class TestPrune:
     def test_prune_removes_oldest_files(self, tmp_path):

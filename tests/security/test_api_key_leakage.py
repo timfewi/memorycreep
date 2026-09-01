@@ -13,10 +13,10 @@ import pytest
 
 from pentestagent.config.settings import Settings
 
-
 # ---------------------------------------------------------------------------
 # Settings — API keys never leak in repr/str
 # ---------------------------------------------------------------------------
+
 
 class TestSettingsApiKeyLeakage:
     FAKE_OPENAI_KEY = "sk-test-openai-secret-do-not-expose"
@@ -60,6 +60,7 @@ class TestSettingsApiKeyLeakage:
 # Settings — API keys not exposed through logging
 # ---------------------------------------------------------------------------
 
+
 class TestSettingsApiKeyLogging:
     def test_logging_settings_does_not_expose_key(self, caplog):
         s = Settings(openai_api_key="sk-logging-test-secret")
@@ -77,6 +78,7 @@ class TestSettingsApiKeyLogging:
 # ---------------------------------------------------------------------------
 # API keys not leaked through exception messages
 # ---------------------------------------------------------------------------
+
 
 class TestApiKeyExceptionLeakage:
     def test_settings_exception_does_not_expose_key(self):
@@ -96,6 +98,7 @@ class TestApiKeyExceptionLeakage:
 # Environment variable hygiene
 # ---------------------------------------------------------------------------
 
+
 class TestEnvVarHygiene:
     def test_api_key_loaded_from_env_correctly(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-env-test"}):
@@ -105,8 +108,11 @@ class TestEnvVarHygiene:
             assert "sk-env-test" not in repr(s)
 
     def test_missing_key_does_not_raise(self):
-        clean = {k: v for k, v in os.environ.items()
-                 if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY")}
+        clean = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY")
+        }
         with patch.dict(os.environ, clean, clear=True):
             s = Settings()
             assert s.openai_api_key is None
@@ -116,6 +122,7 @@ class TestEnvVarHygiene:
 # ---------------------------------------------------------------------------
 # Memory module: system messages excluded from summary (API keys in system prompts)
 # ---------------------------------------------------------------------------
+
 
 class TestMemoryApiKeyLeakage:
     def test_system_messages_excluded_from_format_for_summary(self):
@@ -138,4 +145,6 @@ class TestMemoryApiKeyLeakage:
         hardcoded_patterns = ["sk-", "bearer ", "basic auth", "eyj"]
         lower_prompt = SUMMARY_PROMPT.lower()
         for pattern in hardcoded_patterns:
-            assert pattern not in lower_prompt, f"Found hardcoded secret pattern '{pattern}' in SUMMARY_PROMPT"
+            assert (
+                pattern not in lower_prompt
+            ), f"Found hardcoded secret pattern '{pattern}' in SUMMARY_PROMPT"

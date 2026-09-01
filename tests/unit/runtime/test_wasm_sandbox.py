@@ -106,9 +106,7 @@ def test_output_symlink_is_rejected(tmp_path):
 
 
 def test_unknown_or_wrong_purpose_component_is_rejected():
-    allowlist = ComponentAllowlist(
-        {"a" * 64: {"purpose": "network-scanner"}}
-    )
+    allowlist = ComponentAllowlist({"a" * 64: {"purpose": "network-scanner"}})
 
     with pytest.raises(WasmSandboxError, match="purpose"):
         allowlist.authorize("a" * 64)

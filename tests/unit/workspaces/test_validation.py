@@ -1,13 +1,14 @@
 """Tests for pentestagent.workspaces.validation."""
 
-import pytest
-
-from pentestagent.workspaces.validation import gather_candidate_targets, is_target_in_scope
-
+from pentestagent.workspaces.validation import (
+    gather_candidate_targets,
+    is_target_in_scope,
+)
 
 # ---------------------------------------------------------------------------
 # gather_candidate_targets
 # ---------------------------------------------------------------------------
+
 
 class TestGatherCandidateTargets:
     def test_string_input_returns_itself(self):
@@ -49,7 +50,9 @@ class TestGatherCandidateTargets:
         assert "b.com" in result
 
     def test_irrelevant_key_ignored(self):
-        result = gather_candidate_targets({"command": "nmap -sV 10.0.0.1", "port": "80"})
+        result = gather_candidate_targets(
+            {"command": "nmap -sV 10.0.0.1", "port": "80"}
+        )
         assert result == []
 
     def test_empty_dict_returns_empty(self):
@@ -67,6 +70,7 @@ class TestGatherCandidateTargets:
 # ---------------------------------------------------------------------------
 # is_target_in_scope — IPs
 # ---------------------------------------------------------------------------
+
 
 class TestIsTargetInScopeIPs:
     def test_exact_ip_in_scope(self):
@@ -101,6 +105,7 @@ class TestIsTargetInScopeIPs:
 # is_target_in_scope — CIDRs as candidate
 # ---------------------------------------------------------------------------
 
+
 class TestIsTargetInScopeCIDRs:
     def test_subnet_within_allowed_network(self):
         assert is_target_in_scope("192.168.1.0/24", ["192.168.0.0/16"]) is True
@@ -118,6 +123,7 @@ class TestIsTargetInScopeCIDRs:
 # ---------------------------------------------------------------------------
 # is_target_in_scope — hostnames
 # ---------------------------------------------------------------------------
+
 
 class TestIsTargetInScopeHostnames:
     def test_exact_hostname_match(self):
@@ -137,6 +143,7 @@ class TestIsTargetInScopeHostnames:
 # ---------------------------------------------------------------------------
 # is_target_in_scope — security: bypass attempts
 # ---------------------------------------------------------------------------
+
 
 class TestScopeBypassAttempts:
     """These tests verify that scope validation cannot be trivially bypassed."""

@@ -34,7 +34,7 @@ def mock_llm() -> MagicMock:
         tool_calls=None,
         usage={"prompt_tokens": 100, "completion_tokens": 50},
         model="gpt-5",
-        finish_reason="stop"
+        finish_reason="stop",
     )
     return mock
 
@@ -62,7 +62,7 @@ def sample_finding() -> dict:
         "target": "http://example.com/login",
         "description": "The login form is vulnerable to SQL injection attacks.",
         "evidence": "Parameter 'username' with payload: ' OR '1'='1",
-        "remediation": "Use parameterized queries or prepared statements."
+        "remediation": "Use parameterized queries or prepared statements.",
     }
 
 
@@ -73,13 +73,14 @@ def sample_tool_result() -> dict:
         "tool": "terminal",
         "success": True,
         "output": "nmap scan results...",
-        "duration_ms": 1500.0
+        "duration_ms": 1500.0,
     }
 
 
 @pytest.fixture
 def sample_tool() -> Tool:
     """Create a sample tool for testing."""
+
     async def dummy_execute(arguments: dict, runtime) -> str:
         return f"Executed with: {arguments}"
 
@@ -88,8 +89,8 @@ def sample_tool() -> Tool:
         description="A test tool",
         schema=ToolSchema(
             properties={"param": {"type": "string", "description": "A parameter"}},
-            required=["param"]
+            required=["param"],
         ),
         execute_fn=dummy_execute,
-        category="test"
+        category="test",
     )
