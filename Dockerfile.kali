@@ -1,7 +1,7 @@
 # MemoryCreep Kali Linux Image
 # Full penetration testing environment
 
-FROM kalilinux/kali-last-release@sha256:aa3222eb2e4b3b9c15542f1a081796bb2497f3142b2f99a3ca14aebc987025fe
+FROM kalilinux/kali-last-release@sha256:682d2366a3dcc767f7823a7e364e65ef07715b77134ce7c82b89732e1be645fd
 
 LABEL maintainer="Masic"
 LABEL description="MemoryCreep with Kali Linux tools"
